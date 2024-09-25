@@ -1,0 +1,28 @@
+all: t1
+.PHONY: all
+
+
+t1: t1.c
+	g++ -Wall $< -o $@ 
+
+
+t2: t2.c
+	g++ -Wall $< -o $@ 
+
+
+t3: t3.c
+	g++ -Wall $< -o $@ 
+	
+	
+.PHONY: clean 
+
+clean:
+	rm -f t1
+	rm -f t2
+	rm -f t3
+
+# Some notes
+# $@ represents the left side of the ":"
+# $^ represents the right side of the ":"
+# $< represents the first item in the dependency list   
+
