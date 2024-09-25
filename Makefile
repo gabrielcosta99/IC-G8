@@ -1,20 +1,15 @@
-all: t1
-.PHONY: all
 
 
-t1: t1.c
+t1: t1.cpp
 	g++ -Wall $< -o $@ 
 
 
-t2: t2.c
+t2: t2.cpp
 	g++ -Wall $< -o $@ 
 
 
-t3: t3.c
+t3: t3.cpp
 	g++ -Wall $< -o $@ 
-	
-
-.PHONY: clean 
 
 clean:
 	rm -f t1

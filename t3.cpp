@@ -24,7 +24,6 @@ int main(int argc, char *argv[]){
                     continue;
                 ch = tolower(ch);
                 lowerline+=ch;
-                cout << ch << endl;
                 if(ch == ' ') continue;
                 if(m.find(ch) == m.end()){
                     m.insert(pair<char,int>(ch,1));
@@ -42,7 +41,7 @@ int main(int argc, char *argv[]){
             cout << l;
         }
 
-        cout << "Map contains following elements" << endl;
+        cout << "Character frequencies" << endl;
         for (auto it = m.begin(); it != m.end(); ++it)
             cout << it->first << " = " << it->second << endl;
         file.close();
