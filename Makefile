@@ -13,7 +13,7 @@ t2: t2.c
 t3: t3.c
 	g++ -Wall $< -o $@ 
 	
-	
+
 .PHONY: clean 
 
 clean:
