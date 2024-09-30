@@ -1,0 +1,32 @@
+Part1 -> texto:
+    - gerar um histograma de letras de palavras
+    - calcular a entropia de um ficheiro de texto
+
+    - tirar pontuação adicional
+    - podemos ter um programa por desafio, ou ter um programa onde posso escolher qual dos desafios usar
+    - opção: remover as tags do ficheiro txt fornecido (ex: <p>)
+    - para visualizar histograma:
+        - ter um ficheiro txt com os valores e usar um programa á parte para criar o grafico
+        - criar um grafico no codigo
+    - um simbolo é uma peça de informação que queremos analisar (no caso pode ser letras ou strings)
+
+Part2 -> Som (Wav):
+    - Os ficheiros Wav tem um cabeçalho, um nº de canais, taxa de amostragem, nº de amostras(frames)
+    - Uma frame é um instante  do ficheiro de audio
+    - O primeiro byte é o primeiro canal, o segundo byte é o segundo canal, o seguinte é o primeiro canal, etc
+    - Se quiser fazer um histograma de um canal, ja sabemos que temos de ir de 2 em 2 bytes
+    - Calcular entropia dos sinais de audio
+    - Os sinais de audio tem 16 bits, ou seja, [-2**15,2**15]
+    - Cuidado ao reduzir sinais, pq ao fazer o shift, pode acontecer o seguinte:
+        - xxxx10 -> xxxxx1 -> xxxx10
+        - xxxx11 -> xxxxx1 -> xxxx10
+        (se quiser fazer o shift contrario, vou por um zero á direita, o q n é o valor inicial do sinal debaixo)
+    - pergunta: quantos bits foi necessario remover para notar o ruido?
+    - vector para armazenar a informação do audio para cada um dos canais ou um vector que armazena uma estrutura que tem os canais L e R
+
+Parte3 -> Imagem (PPM):
+    - 3 linhas de cabeçalho (PX, RC, ...)
+    - uma imagem é uma matriz (ncolunas X nLinhas)
+    - canal -> RGB
+    - não ha necessidade de usar uma estrutura nossa, podemos usar a estrutura mat
+    - se deitarmos bits fora (com shifts), a imagem fica mais escura.
