@@ -3,9 +3,6 @@
 #include <fstream>      // to read the file
 #include <filesystem>   // to check if it is a file or if the file exists
 #include <vector>
-#include <cctype>   //to use tolower();
-#include <codecvt>
-#include <locale>
 #include <map>
 #include <sstream>
 

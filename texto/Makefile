@@ -4,8 +4,9 @@ t1: t1.cpp
 	g++ -Wall $< -o $@ 
 
 
+# in this exercise, we need to install boost_locale library, using "sudo apt-get install libboost-all-dev"
 t2: t2.cpp
-	g++ -Wall $< -o $@ 
+	g++ -Wall $< -o $@ -lboost_locale
 
 
 t3: t3.cpp
