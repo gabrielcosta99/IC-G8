@@ -10,17 +10,17 @@
 using namespace std;
 namespace fs = filesystem;
 
-std::string toLower(const char ch) {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    std::wstring wideStr = converter.from_bytes(str);
+// std::string toLower(const char ch) {
+//     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+//     std::wstring wideStr = converter.from_bytes(str);
 
-    // Convert to lowercase using the appropriate locale
-    for (size_t i = 0; i < wideStr.size(); ++i) {
-        wideStr[i] = std::towlower(wideStr[i]);
-    }
+//     // Convert to lowercase using the appropriate locale
+//     for (size_t i = 0; i < wideStr.size(); ++i) {
+//         wideStr[i] = std::towlower(wideStr[i]);
+//     }
 
-    return converter.to_bytes(wideStr);
-}
+//     return converter.to_bytes(wideStr);
+// }
 
 int main(int argc, char *argv[]){
     if(fs::is_regular_file(argv[1])){
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]){
             // cout << line;
             // cout << "\n";
         }
-        for(const string &l: lines){
+        for(string l: lines){
             cout << l;
         }
         file.close();

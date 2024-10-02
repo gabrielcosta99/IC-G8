@@ -14,11 +14,18 @@ t3: t3.cpp
 t4: t4.cpp
 	g++ -Wall $< -o $@ 
 
+oldT4: oldT4.cpp
+	g++ -Wall $< -o $@ 
+
+test: test.cpp
+	g++ -Wall $< -o $@ 
+
 clean:
 	rm -f t1
 	rm -f t2
 	rm -f t3
 	rm -f t4
+	rm -f oldT4
 
 # Some notes
 # $@ represents the left side of the ":"

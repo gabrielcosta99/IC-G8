@@ -7,45 +7,54 @@
 #include <codecvt>
 #include <locale>
 #include <map>
+#include <sstream>
 
 using namespace std;
 namespace fs = filesystem;
 
 int main(int argc, char *argv[]){
-    map<char, int> m;
+    map<string, int> m;
     if(fs::is_regular_file(argv[1])){
         ifstream file(argv[1]);
-        vector<string> lines;
         string line;
-        int nChars = 0;
+        int nWords = 0;
         while(getline(file,line)){
-            string lowerline="";
-            for(char ch: line){
-                if(ispunct(ch))
-                    continue;
-                ch = tolower(ch);
-                lowerline+=ch;
-                if(ch == ' ') continue;
-                if(m.find(ch) == m.end()){
-                    m.insert(pair<char,int>(ch,1));
+            stringstream ss(line);
+            string word;
+            bool tag = false;
+            while(ss >> word){
+                string lowerWord = "";
+                for(char ch: word){
+                    if(ch == '<'){
+                        tag = true;
+                        continue;
+                    }
+                    else if(ch == '>'){
+                        tag=false;
+                        continue;
+                    }
+                    if(ispunct(ch) || tag)
+                        continue;
+                    lowerWord+= tolower(ch);
+                    
                 }
-                else{
-                    m.at(ch)+=1;                    
+                if(lowerWord != ""){
+                    if(m.find(lowerWord) == m.end()){
+                        m.insert(pair<string,int>(lowerWord,1));
+                    }
+                    else{
+                        m.at(lowerWord) += 1;
+                    }
+            
+                    nWords+=1;
                 }
-                nChars+=1;
             }
-            lines.push_back(lowerline);
-            lines.push_back("\n");
-            // cout << line;
-            // cout << "\n";
-        }
-        for(const string &l: lines){
-            cout << l;
+          
         }
 
         cout << "Character frequencies" << endl;
         for (auto it = m.begin(); it != m.end(); ++it)
-            cout << it->first << " = " << (double) it->second/nChars << endl;
+            cout << it->first << " = " << (double) it->second/nWords << endl;
         file.close();
     }
     else{

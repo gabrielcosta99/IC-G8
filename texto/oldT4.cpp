@@ -12,37 +12,39 @@ using namespace std;
 namespace fs = filesystem;
 
 int main(int argc, char *argv[]){
-    map<char, int> m;
+    map<string, int> m;
     if(fs::is_regular_file(argv[1])){
         ifstream file(argv[1]);
         vector<string> lines;
         string line;
-        int nChars = 0;
-        while(getline(file,line)){
-            string lowerline="";
-            for(char ch: line){
-                if(ispunct(ch))
-                    continue;
-                ch = tolower(ch);
-                lowerline+=ch;
-                if(ch == ' ') continue;
-                if(m.find(ch) == m.end()){
-                    m.insert(pair<char,int>(ch,1));
+        int nWords = 0;
+        string word = "";
+        string lowerText = "";
+        for(istreambuf_iterator<char> it(file), end; it != end; ++it){
+            char ch = *it;
+            if(ispunct(ch))
+                continue;
+            ch = tolower(ch);
+            lowerText+=ch;
+            if(ch == ' ' || ch == '\n'){
+                if(m.find(word) == m.end()){
+                    m.insert(pair<string,int>(word,1));
                 }
                 else{
-                    m.at(ch)+=1;                    
+                    m.at(word)+=1;                    
                 }
-                nChars+=1;
+                word = "";
             }
-            lines.push_back(lowerline);
-            lines.push_back("\n");
-            // cout << line;
-            // cout << "\n";
+            else{
+                word+=ch;
+            }
+            
+            nWords+=1;
         }
-
+        cout << lowerText << endl;
         cout << "Character frequencies" << endl;
         for (auto it = m.begin(); it != m.end(); ++it)
-            cout << it->first << " = " << (double) it->second/nChars << endl;
+            cout << it->first << " = " << (double) it->second/nWords << endl;
         file.close();
     }
     else{
