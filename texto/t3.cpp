@@ -3,9 +3,6 @@
 #include <fstream>      // to read the file
 #include <filesystem>   // to check if it is a file or if the file exists
 #include <vector>
-#include <cctype>   //to use tolower();
-#include <codecvt>
-#include <locale>
 #include <map>
 
 using namespace std;
@@ -38,9 +35,6 @@ int main(int argc, char *argv[]){
             lines.push_back("\n");
             // cout << line;
             // cout << "\n";
-        }
-        for(const string &l: lines){
-            cout << l;
         }
 
         cout << "Character frequencies" << endl;
