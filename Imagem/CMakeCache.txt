@@ -221,6 +221,9 @@ DisplayImage_SOURCE_DIR:STATIC=/home/weza/Documents/UA/Year-1/S-1/IC/IC/Imagem
 //The directory containing a CMake configuration file for OpenCV.
 OpenCV_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/opencv4
 
+//The directory containing a CMake configuration file for cxxopts.
+cxxopts_DIR:PATH=cxxopts_DIR-NOTFOUND
+
 
 ########################
 # INTERNAL cache entries

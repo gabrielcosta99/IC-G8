@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -isystem /usr/include/opencv4
+CXX_INCLUDES = -I/home/weza/Documents/UA/Year-1/S-1/IC/IC/Imagem/include -isystem /usr/include/opencv4
 
 CXX_FLAGS = 
 
