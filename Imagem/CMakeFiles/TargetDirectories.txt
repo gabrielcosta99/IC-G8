@@ -1,0 +1,3 @@
+/home/weza/Documents/UA/Year-1/S-1/IC/IC/Imagem/CMakeFiles/DisplayImage.dir
+/home/weza/Documents/UA/Year-1/S-1/IC/IC/Imagem/CMakeFiles/edit_cache.dir
+/home/weza/Documents/UA/Year-1/S-1/IC/IC/Imagem/CMakeFiles/rebuild_cache.dir
