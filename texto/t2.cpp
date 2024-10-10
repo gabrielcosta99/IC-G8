@@ -10,6 +10,10 @@ namespace fs = filesystem;
 
 
 int main(int argc, char *argv[]){
+    if (argc < 2) {
+        cerr << "Usage: " << argv[0] << " <filename>" << endl;
+        return 1;
+    }
     if(fs::is_regular_file(argv[1])){
         ifstream file(argv[1]);
         vector<string> lines;

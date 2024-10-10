@@ -10,6 +10,12 @@ Part1 -> texto:
         - criar um grafico no codigo
     - um simbolo é uma peça de informação que queremos analisar (no caso pode ser letras ou strings)
 
+
+calcular a entropia das palavras no T4
+posso por o top10 de palavras no T4
+
+
+
 Part2 -> Som (Wav):
     - Os ficheiros Wav tem um cabeçalho, um nº de canais, taxa de amostragem, nº de amostras(frames)
     - Uma frame é um instante  do ficheiro de audio
@@ -30,3 +36,7 @@ Parte3 -> Imagem (PPM):
     - canal -> RGB
     - não ha necessidade de usar uma estrutura nossa, podemos usar a estrutura mat
     - se deitarmos bits fora (com shifts), a imagem fica mais escura.
+
+
+criar um script que chame o codigo que o utilizador quer usar com o ficheiro que quer ler
+podemos utilizar opções como: "-lower -punct" para remover pontuação e passar tudo para minusculas
