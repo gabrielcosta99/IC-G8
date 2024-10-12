@@ -14,31 +14,29 @@ int main(int argc, char *argv[]){
         cerr << "Usage: " << argv[0] << " <filename>" << endl;
         return 1;
     }
-    if(fs::is_regular_file(argv[1])){
-        ifstream file(argv[1]);
-        vector<string> lines;
-        string line;
-        while(getline(file,line)){
-            line = boost::locale::to_lower(line, boost::locale::generator().generate(""));
-            string lowerline = "";
-            for(char ch: line){
-                if(ispunct(ch))
-                    continue;
-                lowerline+=ch;
-
-            }
-            lines.push_back(lowerline);
-            lines.push_back("\n");
-
-        }
-        for(string l: lines){
-            cout << l;
-        }
-        file.close();
-    }
-    else{
+    if(!fs::is_regular_file(argv[1])){
         printf("Error opening the file %s\n",argv[1]);
+        return 1;
     }
-    
+    ifstream file(argv[1]);
+    vector<string> lines;
+    string line;
+    while(getline(file,line)){
+        line = boost::locale::to_lower(line, boost::locale::generator().generate(""));
+        string lowerline = "";
+        for(char ch: line){
+            if(ispunct(ch))
+                continue;
+            lowerline+=ch;
+
+        }
+        lines.push_back(lowerline+"\n");
+
+    }
+    for(string l: lines){
+        cout << l;
+    }
+    file.close();
+
     return 0;
 }
