@@ -40,3 +40,6 @@ Parte3 -> Imagem (PPM):
 
 criar um script que chame o codigo que o utilizador quer usar com o ficheiro que quer ler
 podemos utilizar opções como: "-lower -punct" para remover pontuação e passar tudo para minusculas
+
+REPORT + CODE -> 25 out. 23h59
+PEER-REVIEW -> 28 out.

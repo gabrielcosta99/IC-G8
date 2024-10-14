@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 2.8)
+project( Text )
+find_package( boostLocale REQUIRED )
+include_directories( ${OpenCV_INCLUDE_DIRS} include )
+add_executable( Text t1.cpp t2.cpp t3.cpp t4.cpp )
+target_link_libraries( Text ${OpenCV_LIBS} )

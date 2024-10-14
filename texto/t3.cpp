@@ -13,6 +13,15 @@ using namespace std;
 namespace fs = filesystem;
 namespace plt = matplotlibcpp;
 
+double calcEntropy(map<wchar_t, double> charMap){
+    double entropy = 0.0;
+    for(const auto &pair: charMap){
+        double px = pair.second;
+        entropy-= px * log2(px);
+    }
+    return entropy;
+}
+
 int main(int argc, char *argv[]){
     if (argc < 2) {
         cerr << "Usage: " << argv[0] << " <filename>" << endl;
@@ -22,7 +31,7 @@ int main(int argc, char *argv[]){
         printf("Error opening the file %s\n",argv[1]);
         return 1;
     }
-    map<wchar_t, int> charMap;
+    map<wchar_t, double> charMap;
 
     wifstream file(argv[1]);
 
@@ -63,6 +72,7 @@ int main(int argc, char *argv[]){
     */
     
     
+    
 
     // Converter for wide characters to UTF-8
     wstring_convert<codecvt_utf8<wchar_t>> converter;
@@ -77,15 +87,15 @@ int main(int argc, char *argv[]){
         frequencies.push_back((double) p.second);
         indices.push_back(index++);  // Generate numeric index for each character
         */
-     
-
         // For histogram, add the character multiple times based on its frequency
         for (int i = 0; i < p.second; ++i) {
             rawCharacterData.push_back(converter.to_bytes(p.first)); // Use the numeric value of the character
         }
+        charMap[p.first] = (double) (p.second / nChars);
+
     }
 
-    if (indices.empty() || characters.empty()) {
+    if ( characters.empty()) {
         cerr << "Error: No valid characters to plot." << endl;
         return 1;
     }
@@ -94,8 +104,8 @@ int main(int argc, char *argv[]){
     //     cout << c << endl;
 
 
-    plt::hist(rawCharacterData,30);
-
+    plt::hist(rawCharacterData,50);
+    // plt::bar(indices,frequencies)
 
     // Set the x-axis labels to characters
     // plt::xticks(indices, characters);
@@ -108,10 +118,12 @@ int main(int argc, char *argv[]){
     // Display the plot
     plt::show();
     
-    // cout << "Character frequencies" << endl;
-    // for (const auto &p: charMap)
-    //     cout << converter.to_bytes(p.first) << " = " << (double) p.second/nChars << endl;
+    cout << "Character frequencies" << endl;
+    for (const auto &p: charMap)
+        cout << converter.to_bytes(p.first) << " = " << p.second << endl;
     
+    double entropy = calcEntropy(charMap);
+    cout << "entropy: " << entropy << endl;
     
     file.close();
     

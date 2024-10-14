@@ -13,18 +13,18 @@ using namespace std;
 namespace fs = filesystem;
 namespace plt = matplotlibcpp;
 
-bool cmp(pair<wstring, int> &a,
-         pair<wstring, int> &b)
+bool cmp(pair<wstring, double> &a,
+         pair<wstring, double> &b)
 {
     return a.second > b.second;
 }
 
 // Function to sort the map according to value in each pair
-vector<pair<wstring, int>> sortMap(map<wstring, int> &M)
+vector<pair<wstring, double>> sortMap(map<wstring, double> &M)
 {
 
     // Declare vector of pairs
-    vector<pair<wstring, int>> A;
+    vector<pair<wstring, double>> A;
 
     // Copy key-value pair from Map to vector of pairs
     for (auto &it : M)
@@ -38,6 +38,17 @@ vector<pair<wstring, int>> sortMap(map<wstring, int> &M)
     return A;
 }
 
+
+double calcEntropy(map<wstring, double> charMap){
+    double entropy = 0.0;
+    for(const auto &pair: charMap){
+        double px = pair.second;
+        entropy-= px * log2(px);
+    }
+    return entropy;
+}
+
+
 int main(int argc, char *argv[])
 {
     if (argc < 2)
@@ -50,7 +61,7 @@ int main(int argc, char *argv[])
         printf("Error opening the file %s\n", argv[1]);
         return 1;
     }
-    map<wstring, int> wordMap;
+    map<wstring, double> wordMap;
     locale::global(locale("en_US.UTF-8")); // Set the global locale
     wcout.imbue(locale("en_US.UTF-8"));    // Set the locale for wcout to be able to print UTF-8 characters
     
@@ -101,11 +112,13 @@ int main(int argc, char *argv[])
 
                 // if the character is inside of a tag, we ignore the whole word
                 if(tag){
+                    lowerWord = L"";
                     break;
                 }
                 else if(iswalpha_l(ch,c_locale) || (ch == L'-' && lowerWord.length()>0)){ // if the character is a letter, or if it is an "-" like in "trata-se", add the character to the word
                     lowerWord += ch;
                 }else{ // if the word contains non-letters, skip the word
+                    lowerWord = L"";
                     break;
                 }
 
@@ -113,14 +126,14 @@ int main(int argc, char *argv[])
 
             if (!lowerWord.empty())
             {
-                wordMap[lowerWord] += 1;
+                wordMap[lowerWord] += 1.0;
                 nWords += 1;
             }
         }
         freelocale(c_locale);
     }
     // initiate the sorted map
-    vector<pair<wstring, int>> sortedMap = sortMap(wordMap);
+    vector<pair<wstring, double>> sortedMap = sortMap(wordMap);
 
     vector<string> words;
     vector<double> frequencies;
@@ -144,8 +157,11 @@ int main(int argc, char *argv[])
             rawCharacterData.push_back(converter.to_bytes(p.first)); // Use the numeric value of the character
             // wcout << L"Inserting word: \"" << p.first << L"\" Frequency: " << p.second << endl;
         }
+
         count++;
     }
+
+   
     if (indices.empty() || words.empty()) {
         cerr << "Error: No valid words to plot." << endl;
         return 1;
@@ -175,6 +191,14 @@ int main(int argc, char *argv[])
     for (auto it = wordMap.begin(); it != wordMap.end(); ++it)
         wcout << it->first << " = " << (double)it->second  << endl;
     
+
+     // calculate the probability of each word appearing and store it in the map
+    for(const auto &pair : wordMap){
+        wordMap[pair.first] = pair.second/nWords;
+    }
+    double entropy = calcEntropy(wordMap);
+    wcout << L"entropy: " << entropy << endl;
+
     file.close();
     
 
