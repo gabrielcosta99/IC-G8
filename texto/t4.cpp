@@ -49,18 +49,9 @@ double calcEntropy(map<wstring, double> charMap){
 }
 
 
-int main(int argc, char *argv[])
+int runT4(int argc, char *argv[])
 {
-    if (argc < 2)
-    {
-        cerr << "Usage: " << argv[0] << " <filename>" << endl;
-        return 1;
-    }
-    if (!fs::is_regular_file(argv[1]))
-    {
-        printf("Error opening the file %s\n", argv[1]);
-        return 1;
-    }
+
     map<wstring, double> wordMap;
     locale::global(locale("en_US.UTF-8")); // Set the global locale
     wcout.imbue(locale("en_US.UTF-8"));    // Set the locale for wcout to be able to print UTF-8 characters
@@ -187,17 +178,17 @@ int main(int argc, char *argv[])
     // Display the plot
     plt::show();
 
-    wcout << "Character frequencies" << endl;
-    for (auto it = wordMap.begin(); it != wordMap.end(); ++it)
-        wcout << it->first << " = " << (double)it->second  << endl;
+    // wcout << "Character frequencies" << endl;
+    // for (auto it = wordMap.begin(); it != wordMap.end(); ++it)
+    //     wcout << it->first << " = " << (double)it->second  << endl;
     
 
      // calculate the probability of each word appearing and store it in the map
-    for(const auto &pair : wordMap){
-        wordMap[pair.first] = pair.second/nWords;
-    }
-    double entropy = calcEntropy(wordMap);
-    wcout << L"entropy: " << entropy << endl;
+    // for(const auto &pair : wordMap){
+    //     wordMap[pair.first] = pair.second/nWords;
+    // }
+    // double entropy = calcEntropy(wordMap);
+    // wcout << L"entropy: " << entropy << endl;
 
     file.close();
     
