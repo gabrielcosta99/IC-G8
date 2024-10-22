@@ -1,6 +1,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <cxxopts.hpp>
+#include <cmath>  // For log10
 
 using namespace cv;
 using namespace std;
@@ -91,10 +92,6 @@ void drawGrayscaleHistogram(const Mat& gray_image, int hist_w = 512, int hist_h 
 
     displayImagesSideBySide(gray_image,histImage,"Hist");
 
-   //// Display the histogram
-   //imshow("Grayscale Histogram", histImage);
-   //// display the image
-   //imshow("Grayscale image", gray_image);
 }
 
 // Function to apply Gaussian blur with different kernel sizes
@@ -111,22 +108,78 @@ void applyGaussianBlur(const Mat& image, int size = 3)
 void displayDifferenceImage(const Mat& diffImage)
 {
     Mat diffGray;
-    cvtColor(diffImage, diffGray, COLOR_BGR2GRAY);  // Convert to grayscale if needed
+    //cvtColor(diffImage, diffGray, COLOR_BGR2GRAY);  // Convert to grayscale if needed
 
-    // Scale the difference image for better visibility (optional)
-    Mat diffEnhanced;
-    normalize(diffGray, diffEnhanced, 0, 255, NORM_MINMAX);
-
-    imshow("Difference Image (Enhanced)", diffEnhanced);
+    imshow("Difference Image", diffGray);
 }
 
 // Function to compute the absolute difference between two images
 Mat calculateAbsoluteDifference(const Mat& image1, const Mat& image2)
 {
+
+    
     Mat diff;
-    absdiff(image1, image2, diff);  // Calculate absolute difference between image1 and image2
+    absdiff(image1, image2, diff);
     return diff;
 }
+
+
+// Function to calculate the Mean Squared Error (MSE)
+double computeMSE(const Mat& image1, const Mat& image2)
+{   
+
+    Mat diff;
+    absdiff(image1, image2, diff);  // Get the difference image
+    diff.convertTo(diff, CV_32F);   // Convert to float for precision
+
+    // Square the differences and compute the mean
+    diff = diff.mul(diff);          // Square each element
+    Scalar sum = cv::sum(diff);     // Sum all the squared differences
+
+    double mse = sum[0] / (double)(image1.total());
+    return mse;
+}
+
+// Function to calculate the Peak Signal-to-Noise Ratio (PSNR)
+double computePSNR(const Mat& image1, const Mat& image2)
+{
+
+
+    double mse = computeMSE(image1, image2);
+    if (mse == 0)
+    {
+        return std::numeric_limits<double>::infinity();  // Infinite PSNR means no difference
+    }
+    double psnr = 10.0 * log10((255 * 255) / mse);
+    return psnr;
+}
+
+
+// Function to quantize a grayscale image with a specified number of levels
+Mat quantizeImage(const Mat& gray_image, int num_levels)
+{
+    Mat quantized_image = gray_image.clone(); // Clone the input image to preserve the original
+    int step = 256 / num_levels;  // Calculate the step size based on the number of levels
+
+    // Iterate over each pixel and apply quantization
+    for (int i = 0; i < gray_image.rows; i++)
+    {
+        for (int j = 0; j < gray_image.cols; j++)
+        {
+            // Get the pixel value
+            int pixel_value = gray_image.at<uchar>(i, j);
+
+            // Quantize the pixel value
+            int quantized_value = (pixel_value / step) * step;
+
+            // Set the quantized value in the output image
+            quantized_image.at<uchar>(i, j) = quantized_value;
+        }
+    }
+
+    return quantized_image;
+}
+
 
 
 int main(int argc, char** argv)
@@ -141,7 +194,9 @@ int main(int argc, char** argv)
             ("i2,image2", "Path to the second image file (for comparison)", cxxopts::value<string>())
             ("gsh", "Display grayscale histogram")
             ("gf", "Apply Gaussian blur with specified kernel size", cxxopts::value<int>()->default_value("3")->implicit_value("3"))
-            ("diff", "Compute absolute difference between two images and display MSE & PSNR")
+            ("diff", "Compute absolute difference between two images")
+            ("split", "Split the image into RGB channels")
+            ("q,quantize", "Quantize the image to a specified number of levels", cxxopts::value<int>()->default_value("16")->implicit_value("16"))
             ("h,help", "Print usage");
 
         auto result = options.parse(argc, argv);
@@ -180,12 +235,13 @@ int main(int argc, char** argv)
         else if (result.count("gf"))
         {
             int kernel_size = result["gf"].as<int>();
+            
             cout << "Applying Gaussian Blur with kernel size: " << kernel_size << endl;
             applyGaussianBlur(image, kernel_size);
 
-        }else  if (result.count("image2"))
+        }else  if (result.count("i2"))
         {
-            string image2_path = result["image2"].as<string>();
+            string image2_path = result["i2"].as<string>();
             Mat image2 = imread(image2_path, IMREAD_COLOR); // Read the second image
 
             if (!image2.data)
@@ -197,14 +253,61 @@ int main(int argc, char** argv)
             // If 'diff' option is selected, calculate and display differences
             if (result.count("diff"))
             {
-                Mat diffImage = calculateAbsoluteDifference(image, image2);
-                displayDifferenceImage(diffImage);
 
-                //double mse = computeMSE(image1, image2);
-                //double psnr = computePSNR(image1, image2);
-                //cout << "MSE: " << mse << endl;
-                //cout << "PSNR: " << psnr << " dB" << endl;
+                Mat resizedImage2;
+                // Resize the second image to match the size of the first image
+                if (image.size() != image2.size())
+                {
+                    cout << "Resizing second image to match the first image size." << endl;
+                    resize(image2, resizedImage2, image.size());
+                }
+                else
+                {
+                    resizedImage2 = image2;
+                }
+
+                Mat diffImage = calculateAbsoluteDifference(image, resizedImage2);
+                imshow("Difference Image", diffImage);
+
+                // Compute MSE and PSNR
+                double mse = computeMSE(image, resizedImage2);
+                double psnr = computePSNR(image, resizedImage2);
+
+                // Output the results to the console
+                cout << "MSE: " << mse << endl;
+                cout << "PSNR: " << psnr << " dB" << endl;
             }
+        }else if (result.count("split"))
+        {
+            // Split the image into RGB channels
+            Mat bgr[3];
+            split(image, bgr);
+
+            // Display the individual channels
+            imshow("Blue Channel", bgr[0]);
+            imshow("Green Channel", bgr[1]);
+            imshow("Red Channel", bgr[2]);
+        
+        }else if(result.count("q"))
+        {
+            int num_levels = result["q"].as<int>();
+            Mat quantized_image = quantizeImage(gray_image, num_levels);
+            
+            // Display original and quantized images
+            displayImagesSideBySide(gray_image, quantized_image, "Original vs Quantized");
+
+            // display image difference
+            Mat diff;
+            absdiff(gray_image, quantized_image, diff);
+            imshow("Difference Image", diff);
+
+            // Compute and display MSE and PSNR
+            double mse = computeMSE(gray_image, quantized_image);
+            double psnr = computePSNR(gray_image, quantized_image);
+
+            cout << "Quantization Levels: " << num_levels << endl;
+            cout << "MSE: " << mse << endl;
+            cout << "PSNR: " << psnr << " dB" << endl;
         }else {
             imshow("Original Image", image);
         }
