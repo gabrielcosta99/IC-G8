@@ -1,0 +1,3 @@
+/home/gabriel/UA/4ano/IC/project1/texto/CMakeFiles/Text.dir
+/home/gabriel/UA/4ano/IC/project1/texto/CMakeFiles/edit_cache.dir
+/home/gabriel/UA/4ano/IC/project1/texto/CMakeFiles/rebuild_cache.dir

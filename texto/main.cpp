@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
         cout << "  -t2  ->  converts the contents of a file to lowercase and remove punctuation" << endl;
         cout << "  -t3  ->  counts the frequency of characters in a given file" << endl;
         cout << "  -t4  ->  counts the frequency of words in a given file" << endl;
-        cout << "\nExample:\n  " << argv[0]<< " -t1 ep-01-01-15.txt     prints the contents of the file 'ep-01-01-15.txt'"<<endl;
+        cout << "\nExample:\n  " << argv[0]<< " -t1 text_files/ep-01-01-15.txt     prints the contents of the file 'ep-01-01-15.txt'"<<endl;
         return 0;
     }
 
