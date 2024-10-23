@@ -10,6 +10,46 @@
 using namespace std;
 namespace fs = filesystem;
 
+// Function to create improved exponential bins
+vector<int> create_exponential_bins(const vector<float>& data, int num_bins) {
+    vector<int> histogram(num_bins, 0);
+
+    // Calculate bin boundaries
+    float min_val = *min_element(data.begin(), data.end());
+    float max_val = *max_element(data.begin(), data.end());
+
+    // Calculate exponential bin ranges
+    vector<float> bin_boundaries(num_bins + 1);
+    for (int i = 0; i <= num_bins; ++i) {
+        bin_boundaries[i] = min_val + (max_val - min_val) * (pow(2, float(i) / num_bins) - 1) / (pow(2, 1.0f) - 1);
+    }
+
+    // Sort the data into bins
+    for (float sample : data) {
+        int bin_index = upper_bound(bin_boundaries.begin(), bin_boundaries.end(), sample) - bin_boundaries.begin() - 1;
+        bin_index = min(bin_index, num_bins - 1);  // Ensure we don't exceed bin bounds
+        histogram[bin_index]++;
+    }
+
+    return histogram;
+}
+
+// Function to save histogram data to file
+void save_histogram_data(const vector<int>& histogram, const char* filename) {
+    ofstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error opening file: " << filename << endl;
+        return;
+    }
+
+    // Save histogram data (bin index and count)
+    for (size_t i = 0; i < histogram.size(); ++i) {
+        file << i << " " << histogram[i] << endl;
+    }
+
+    file.close();
+}
+
 // Function to plot histogram using gnuplot
 void plot_histogram(const char* data_filename, const char* title) {
     FILE* gnuplotPipe = popen("gnuplot -persistent", "w");
@@ -19,67 +59,29 @@ void plot_histogram(const char* data_filename, const char* title) {
         return;
     }
 
-    // Setup gnuplot to plot the histogram
+    // Setup gnuplot to plot the histogram with a logarithmic y-axis
     fprintf(gnuplotPipe, "set title '%s'\n", title);
-    fprintf(gnuplotPipe, "set xlabel 'Amplitude'\n");
+    fprintf(gnuplotPipe, "set xlabel 'Amplitude (linear scale)'\n");
     fprintf(gnuplotPipe, "set ylabel 'Frequency'\n");
-    fprintf(gnuplotPipe, "set style fill solid\n");
-    fprintf(gnuplotPipe, "plot '%s' using 1:2 with boxes notitle\n", data_filename);
+    fprintf(gnuplotPipe, "set logscale y\n");  // Logarithmic scaling for y-axis
+
+    // Improving the plot style
+    fprintf(gnuplotPipe, "set style fill solid 0.5 border -1\n");  // Set transparency for bars
+    fprintf(gnuplotPipe, "set boxwidth 0.9 relative\n");  // Make boxes wider for better readability
+    fprintf(gnuplotPipe, "set grid ytics lc rgb '#bbbbbb' lw 1 lt 0\n");  // Light grey grid lines
+    fprintf(gnuplotPipe, "set xtics rotate by -45\n");  // Rotate x-ticks for better labeling
+    fprintf(gnuplotPipe, "set xtics 0.05\n"); // Fine xtics for amplitude visibility
+
+
+    // Plot with labeled bins and using a color gradient
+    fprintf(gnuplotPipe, "plot '%s' using 1:2:xticlabels(1) with boxes notitle\n", data_filename);
+    
     fflush(gnuplotPipe);
 
-    // Wait for user input to close the plot
     cout << "Press Enter to close the plot for " << title << "...";
     cin.ignore();
 
-    // Close the pipe
     pclose(gnuplotPipe);
-}
-
-// Function to normalize data to [-1, 1]
-vector<float> normalize_data(const vector<float>& data) {
-    float max_val = *max_element(data.begin(), data.end());
-    float min_val = *min_element(data.begin(), data.end());
-    float range = max(max_val, -min_val);  // The maximum absolute value
-
-    vector<float> normalized_data(data.size());
-    for (size_t i = 0; i < data.size(); ++i) {
-        normalized_data[i] = data[i] / range;
-    }
-    return normalized_data;
-}
-
-// Create histogram with bins increasing in powers of 2
-vector<int> create_logarithmic_histogram(const vector<float>& data, int num_bins) {
-    vector<int> histogram(num_bins, 0);
-
-    // Assuming normalized data in range [-1, 1]
-    for (float sample : data) {
-        // Map the sample to a bin index
-        float normalized_sample = fabs(sample);  // Use absolute value for symmetric bins
-        int bin_index = (normalized_sample == 0.0f) ? 0 : static_cast<int>(log2(normalized_sample * (1 << (num_bins - 1))));
-        
-        // Safeguard against any possible overflow or negative indices
-        bin_index = min(max(bin_index, 0), num_bins - 1);
-        histogram[bin_index]++;
-    }
-
-    return histogram;
-}
-
-// Save histogram data to file
-void save_histogram_data(const vector<int>& histogram, const char* filename, int num_bins) {
-    ofstream file(filename);
-    if (!file.is_open()) {
-        cerr << "Error opening file: " << filename << endl;
-        return;
-    }
-
-    // Save bin index and histogram count (logarithmic binning)
-    for (int i = 0; i < num_bins; ++i) {
-        file << pow(2, i) << " " << histogram[i] << endl;
-    }
-
-    file.close();
 }
 
 int main(int argc, char* argv[]) {
@@ -112,13 +114,9 @@ int main(int argc, char* argv[]) {
 
     sf_readf_float(sf, buffer, frames);
 
-    // Vectors to hold amplitude data for each channel
-    vector<float> left_channel;
-    vector<float> right_channel;
-    vector<float> mid_channel;
-    vector<float> side_channel;
-
     // Collect amplitude values for left, right, mid, and side channels
+    vector<float> left_channel, right_channel, mid_channel, side_channel;
+
     for (int i = 0; i < frames; i++) {
         float left_sample = buffer[i * 2];      // Left channel
         float right_sample = buffer[i * 2 + 1]; // Right channel
@@ -134,26 +132,20 @@ int main(int argc, char* argv[]) {
         side_channel.push_back(side_sample);
     }
 
-    // Normalize the channels to [-1, 1]
-    left_channel = normalize_data(left_channel);
-    right_channel = normalize_data(right_channel);
-    mid_channel = normalize_data(mid_channel);
-    side_channel = normalize_data(side_channel);
-
     // Parameters for histogram
-    int num_bins = 10; // Logarithmic bins
+    int num_bins = 16;  // Increased number of bins for more amplitude detail
 
-    // Create histograms with logarithmic binning
-    vector<int> left_histogram = create_logarithmic_histogram(left_channel, num_bins);
-    vector<int> right_histogram = create_logarithmic_histogram(right_channel, num_bins);
-    vector<int> mid_histogram = create_logarithmic_histogram(mid_channel, num_bins);
-    vector<int> side_histogram = create_logarithmic_histogram(side_channel, num_bins);
+    // Create histograms using 
+    vector<int> left_histogram = create_exponential_bins (left_channel, num_bins);
+    vector<int> right_histogram = create_exponential_bins(right_channel, num_bins);
+    vector<int> mid_histogram = create_exponential_bins(mid_channel, num_bins);
+    vector<int> side_histogram = create_exponential_bins(side_channel, num_bins);
 
-    // Save histogram data to files
-    save_histogram_data(left_histogram, "left_histogram.dat", num_bins);
-    save_histogram_data(right_histogram, "right_histogram.dat", num_bins);
-    save_histogram_data(mid_histogram, "mid_histogram.dat", num_bins);
-    save_histogram_data(side_histogram, "side_histogram.dat", num_bins);
+    // Save histograms to files
+    save_histogram_data(left_histogram, "left_histogram.dat");
+    save_histogram_data(right_histogram, "right_histogram.dat");
+    save_histogram_data(mid_histogram, "mid_histogram.dat");
+    save_histogram_data(side_histogram, "side_histogram.dat");
 
     // Plot the histograms for left, right, mid, and side channels
     plot_histogram("left_histogram.dat", "Left Channel Amplitude Histogram");
