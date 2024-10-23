@@ -2,9 +2,11 @@
 #include <opencv2/opencv.hpp>
 #include <cxxopts.hpp>
 #include <cmath>  // For log10
+#include <chrono> // For timers
 
 using namespace cv;
 using namespace std;
+using namespace std::chrono;
 
 
 
@@ -47,6 +49,7 @@ void displayImagesSideBySide(const Mat& image1, const Mat& image2, const string&
 // Function to draw and display a grayscale histogram
 void drawGrayscaleHistogram(const Mat& gray_image, int hist_w = 512, int hist_h = 400, int gap = 1)
 {
+    auto start = high_resolution_clock::now(); // Start timer
     // Calculate the histogram of the grayscale image
     int histSize = 256;    // bin size
     float range[] = { 0, 256 }; // range of pixel values
@@ -92,16 +95,34 @@ void drawGrayscaleHistogram(const Mat& gray_image, int hist_w = 512, int hist_h 
 
     displayImagesSideBySide(gray_image,histImage,"Hist");
 
+    auto end = high_resolution_clock::now(); // End timer
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Time taken to calculate the histogram " << duration.count() << " ms" << endl;
+
 }
 
 // Function to apply Gaussian blur with different kernel sizes
 void applyGaussianBlur(const Mat& image, int size = 3)
 {
+    auto start = high_resolution_clock::now(); // Start timer
     Mat blurredImage;
     GaussianBlur(image, blurredImage, Size(size, size), 0);
     displayImagesSideBySide(image,blurredImage,"Original image/Gaussian Blur");
-    //imshow("Original image", image);
-    //imshow("Gaussian Blur", blurredImage);
+    auto end = high_resolution_clock::now(); // End timer
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Time taken to calculate gaussian blur: " << duration.count() << " ms" << endl;
+
+}
+void RGB_applyGaussianBlur(const Mat& image, int size = 3)
+{
+    auto start = high_resolution_clock::now(); // Start timer
+    Mat blurredImage;
+    GaussianBlur(image, blurredImage, Size(size, size), 0);
+    displayImagesSideBySide(image,blurredImage,"Original image/Gaussian Blur");
+    auto end = high_resolution_clock::now(); // End timer
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Time taken to calculate gaussian blur: " << duration.count() << " ms" << endl;
+
 }
 
 // Function to display the difference image
@@ -128,6 +149,7 @@ Mat calculateAbsoluteDifference(const Mat& image1, const Mat& image2)
 double computeMSE(const Mat& image1, const Mat& image2)
 {   
 
+    
     Mat diff;
     absdiff(image1, image2, diff);  // Get the difference image
     diff.convertTo(diff, CV_32F);   // Convert to float for precision
@@ -137,13 +159,14 @@ double computeMSE(const Mat& image1, const Mat& image2)
     Scalar sum = cv::sum(diff);     // Sum all the squared differences
 
     double mse = sum[0] / (double)(image1.total());
+
+
     return mse;
 }
 
 // Function to calculate the Peak Signal-to-Noise Ratio (PSNR)
 double computePSNR(const Mat& image1, const Mat& image2)
-{
-
+{   
 
     double mse = computeMSE(image1, image2);
     if (mse == 0)
@@ -151,6 +174,7 @@ double computePSNR(const Mat& image1, const Mat& image2)
         return std::numeric_limits<double>::infinity();  // Infinite PSNR means no difference
     }
     double psnr = 10.0 * log10((255 * 255) / mse);
+
     return psnr;
 }
 
@@ -158,6 +182,7 @@ double computePSNR(const Mat& image1, const Mat& image2)
 // Function to quantize a grayscale image with a specified number of levels
 Mat quantizeImage(const Mat& gray_image, int num_levels)
 {
+    auto start = high_resolution_clock::now(); // Start timer
     Mat quantized_image = gray_image.clone(); // Clone the input image to preserve the original
     int step = 256 / num_levels;  // Calculate the step size based on the number of levels
 
@@ -177,10 +202,91 @@ Mat quantizeImage(const Mat& gray_image, int num_levels)
         }
     }
 
+    auto end = high_resolution_clock::now(); // End timer
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Time taken to quantize the image " << duration.count() << " ms" << endl;
+
     return quantized_image;
 }
 
 
+// Function to quantize an RGB image with a specified number of levels
+Mat  RGB_quantizeImage(const Mat& rgb_image, int num_levels)
+{
+    auto start = high_resolution_clock::now(); // Start timer
+
+    // Split the image into 3 channels (B, G, R)
+    Mat bgr[3];
+    split(rgb_image, bgr);
+
+    // Apply quantization to each channel
+    for (int k = 0; k < 3; k++) {
+        int step = 256 / num_levels;  // Calculate the step size based on the number of levels
+
+        for (int i = 0; i < bgr[k].rows; i++)
+        {
+            for (int j = 0; j < bgr[k].cols; j++)
+            {
+                int pixel_value = bgr[k].at<uchar>(i, j);
+
+                // Quantize the pixel value
+                int quantized_value = (pixel_value / step) * step;
+
+                // Set the quantized value in the output channel
+                bgr[k].at<uchar>(i, j) = quantized_value;
+            }
+        }
+    }
+
+    // Merge the quantized channels back into one image
+    Mat quantized_image;
+    merge(bgr, 3, quantized_image);
+
+    auto end = high_resolution_clock::now(); // End timer
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Time taken to quantize the image " << duration.count() << " ms" << endl;
+
+    return quantized_image;
+}
+
+// Function to calculate the Mean Squared Error (MSE) for RGB images
+double  RGB_computeMSE(const Mat& image1, const Mat& image2)
+{
+    // Split the images into 3 channels (B, G, R)
+    Mat bgr1[3], bgr2[3];
+    split(image1, bgr1);
+    split(image2, bgr2);
+
+    double mse_total = 0.0;
+    // Calculate MSE for each channel and sum it
+    for (int k = 0; k < 3; k++)
+    {
+        Mat diff;
+        absdiff(bgr1[k], bgr2[k], diff);  // Get the difference image for channel k
+        diff.convertTo(diff, CV_32F);     // Convert to float for precision
+
+        diff = diff.mul(diff);            // Square the differences
+        Scalar sum = cv::sum(diff);       // Sum all the squared differences
+
+        double mse_channel = sum[0] / (double)(bgr1[k].total());
+        mse_total += mse_channel;         // Sum the MSE of each channel
+    }
+
+    // Average MSE across the three channels
+    return mse_total / 3.0;
+}
+
+// Function to calculate the Peak Signal-to-Noise Ratio (PSNR) for RGB images
+double RGB_computePSNR(const Mat& image1, const Mat& image2)
+{
+    double mse = computeMSE(image1, image2);
+    if (mse == 0)
+    {
+        return std::numeric_limits<double>::infinity();  // Infinite PSNR means no difference
+    }
+    double psnr = 10.0 * log10((255 * 255) / mse);
+    return psnr;
+}
 
 int main(int argc, char** argv)
 {
@@ -194,9 +300,11 @@ int main(int argc, char** argv)
             ("i2,image2", "Path to the second image file (for comparison)", cxxopts::value<string>())
             ("gsh", "Display grayscale histogram")
             ("gf", "Apply Gaussian blur with specified kernel size", cxxopts::value<int>()->default_value("3")->implicit_value("3"))
+            ("gf")
             ("diff", "Compute absolute difference between two images")
             ("split", "Split the image into RGB channels")
-            ("q,quantize", "Quantize the image to a specified number of levels", cxxopts::value<int>()->default_value("16")->implicit_value("16"))
+            ("q", "Quantize the image to a specified number of levels", cxxopts::value<int>()->default_value("16")->implicit_value("16"))
+            ("qrgb", "Quantize the RGB image to a specified number of levels", cxxopts::value<int>()->default_value("16")->implicit_value("16"))
             ("h,help", "Print usage");
 
         auto result = options.parse(argc, argv);
@@ -308,7 +416,27 @@ int main(int argc, char** argv)
             cout << "Quantization Levels: " << num_levels << endl;
             cout << "MSE: " << mse << endl;
             cout << "PSNR: " << psnr << " dB" << endl;
-        }else {
+        }else if("qrgb")
+        {
+            int num_levels = result["qrgb"].as<int>();
+            Mat quantized_image = RGB_quantizeImage(image, num_levels);
+            
+            // Display original and quantized images
+            displayImagesSideBySide(image, quantized_image, "Original vs Quantized");
+
+            // display image difference
+            Mat diff;
+            absdiff(image, quantized_image, diff);
+            imshow("Difference Image", diff);
+
+            // Compute and display MSE and PSNR
+            double mse = RGB_computeMSE(image, quantized_image);
+            double psnr = RGB_computePSNR(image, quantized_image);
+
+            cout << "Quantization Levels: " << num_levels << endl;
+            cout << "MSE: " << mse << endl;
+            cout << "PSNR: " << psnr << " dB" << endl;
+        }else{
             imshow("Original Image", image);
         }
 
