@@ -41,14 +41,6 @@ int main (int argc, char *argv[]) {
 
     sf_readf_float(sf, buffer, frames);
 
-    // Separate left and right channels
-    for (int i = 0; i < frames; i++) {
-        float left_sample = buffer[i * 2];     // Left channel
-        float right_sample = buffer[i * 2 + 1]; // Right channel
-
-        cout << "Frame " << i << " - Left: " << left_sample << ", Right: " << right_sample << endl;
-    }
-
     sf_close(sf);
     delete[] buffer;
 
