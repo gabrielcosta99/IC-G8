@@ -101,29 +101,7 @@ void drawGrayscaleHistogram(const Mat& gray_image, int hist_w = 512, int hist_h 
 
 }
 
-// Function to apply Gaussian blur with different kernel sizes
-void applyGaussianBlur(const Mat& image, int size = 3)
-{
-    auto start = high_resolution_clock::now(); // Start timer
-    Mat blurredImage;
-    GaussianBlur(image, blurredImage, Size(size, size), 0);
-    displayImagesSideBySide(image,blurredImage,"Original image/Gaussian Blur");
-    auto end = high_resolution_clock::now(); // End timer
-    auto duration = duration_cast<milliseconds>(end - start);
-    cout << "Time taken to calculate gaussian blur: " << duration.count() << " ms" << endl;
 
-}
-void RGB_applyGaussianBlur(const Mat& image, int size = 3)
-{
-    auto start = high_resolution_clock::now(); // Start timer
-    Mat blurredImage;
-    GaussianBlur(image, blurredImage, Size(size, size), 0);
-    displayImagesSideBySide(image,blurredImage,"Original image/Gaussian Blur");
-    auto end = high_resolution_clock::now(); // End timer
-    auto duration = duration_cast<milliseconds>(end - start);
-    cout << "Time taken to calculate gaussian blur: " << duration.count() << " ms" << endl;
-
-}
 
 // Function to display the difference image
 void displayDifferenceImage(const Mat& diffImage)
@@ -288,6 +266,30 @@ double RGB_computePSNR(const Mat& image1, const Mat& image2)
     return psnr;
 }
 
+// Function to apply Gaussian blur with different kernel sizes
+void applyGaussianBlur(const Mat& image, int size = 3)
+{
+    auto start = high_resolution_clock::now(); // Start timer
+    Mat blurredImage;
+    GaussianBlur(image, blurredImage, Size(size, size), 0);
+    displayImagesSideBySide(image,blurredImage,"Original image/Gaussian Blur");
+    
+    
+    auto end = high_resolution_clock::now(); // End timer
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Time taken to calculate gaussian blur: " << duration.count() << " ms" << endl;
+
+    // Compute and display MSE and PSNR
+    double mse = RGB_computeMSE(image, blurredImage);
+    double psnr = RGB_computePSNR(image, blurredImage);
+
+    
+    cout << "MSE: " << mse << endl;
+    cout << "PSNR: " << psnr << " dB" << endl;
+
+}
+
+
 int main(int argc, char** argv)
 {
     try
@@ -300,7 +302,6 @@ int main(int argc, char** argv)
             ("i2,image2", "Path to the second image file (for comparison)", cxxopts::value<string>())
             ("gsh", "Display grayscale histogram")
             ("gf", "Apply Gaussian blur with specified kernel size", cxxopts::value<int>()->default_value("3")->implicit_value("3"))
-            ("gf")
             ("diff", "Compute absolute difference between two images")
             ("split", "Split the image into RGB channels")
             ("q", "Quantize the image to a specified number of levels", cxxopts::value<int>()->default_value("16")->implicit_value("16"))
@@ -346,6 +347,8 @@ int main(int argc, char** argv)
             
             cout << "Applying Gaussian Blur with kernel size: " << kernel_size << endl;
             applyGaussianBlur(image, kernel_size);
+
+            
 
         }else  if (result.count("i2"))
         {

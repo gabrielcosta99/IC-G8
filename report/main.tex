@@ -8,6 +8,8 @@
 \usepackage{geometry}  % For page layout
 \usepackage{xcolor}   % For colors
 \usepackage{listings} % For code snippets
+\usepackage{float}     % For image positioning
+\usepackage[format=plain,justification=center]{caption}
 \usepackage[utf8]{inputenc} % For special characters
 \geometry{a4paper, margin=1in}
 
@@ -210,30 +212,75 @@ Summarize the results of audio manipulation:
 \end{itemize}
 
 \subsection{Image Data}
-Summarize the results of image manipulation:
+The image data processing produced several interesting results across different techniques:
+
+
 \begin{itemize}
-    \item Image histograms and filtered images.
-    \item MSE and PSNR for original and processed images.
+    \item Grayscale conversion simplified the analysis by reducing the image to a single intensity channel. The grayscale histogram revealed the distribution of brightness levels across the image.
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.8\linewidth]{lena_gsh.png}
+        \caption{Grayscale image and its corresponding intensity histogram.\\
+        Time taken to calculate the histogram 47 ms}
+        \label{fig:gsh}
+    \end{figure}
+    \item Applying a Gaussian blur with different kernel sizes demonstrated that larger kernels resulted in more pronounced smoothing, at the cost of losing fine details.
+    \begin{itemize}
+        \item MSE values increased with larger kernel sizes, indicating a greater difference between the original and blurred images.
+        \item PSNR values decreased with larger kernel sizes, reflecting the quality loss introduced by the blur.
+    \end{itemize}
+    
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.5\linewidth]{lena_gf3.png}
+        \caption{original image compared to applied GaussianBlur with kernelsize 3, very minor difference.\\
+        Time taken to calculate gaussian blur: 45 ms\\
+        MSE: 22.9285 \\
+        PSNR: 33.147 dB}
+        \label{fig:gf3}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.5\linewidth]{lena_gf13.png}
+        \caption{original image compared to applied GaussianBlur with kernelsize 13, noticable difference.\\
+        Time taken to calculate gaussian blur: 51 ms \\
+        MSE: 114.884 \\
+        PSNR: 27.7703 dB}
+        \label{fig:gf13}
+    \end{figure}
+    
+    \item The image comparison metrics allowed us to objectively evaluate the effect of each transformation, providing quantitative evidence of the changes observed visually.
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.5\linewidth]{lena_q.png}
+        \caption{original image compared to applied quantized with 16 levels \\
+        Time taken to quantize the image 4 ms \\
+        MSE: 79.0271 \\
+        PSNR: 29.138 dB}
+        \label{fig:q}
+    \end{figure}
+    
 \end{itemize}
 
-\section{Performance Analysis}
-\begin{itemize}
-    \item Processing time for various tasks.
-    \item Trade-offs between quality and compression.
-\end{itemize}
 
-\section{Discussion}
-\begin{itemize}
-    \item Analysis of outcomes, strengths, and limitations.
-    \item Possible improvements for future work.
-\end{itemize}
+
+%\section{Performance Analysis}
+%\begin{itemize}
+%    \item Processing time for various tasks.
+%    \item Trade-offs between quality and compression.
+%\end{itemize}
+
+%\section{Discussion}
+%\begin{itemize}
+%    \item Analysis of outcomes, strengths, and limitations.
+%    \item Possible improvements for future work.
+%\end{itemize}
 
 \section{Conclusion}
 Summarize the key takeaways and learning outcomes from the project.
 
 \section{Appendix}
 \begin{itemize}
-    \item Sample code snippets.
     \item Link to the project repository: \url{https://github.com/gabrielcosta99/IC-G8.git}
 \end{itemize}
 

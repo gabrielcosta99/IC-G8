@@ -14,7 +14,5 @@
 \contentsline {subsection}{\numberline {4.1}Text Data}{6}{subsection.4.1}%
 \contentsline {subsection}{\numberline {4.2}Audio Data}{6}{subsection.4.2}%
 \contentsline {subsection}{\numberline {4.3}Image Data}{7}{subsection.4.3}%
-\contentsline {section}{\numberline {5}Performance Analysis}{7}{section.5}%
-\contentsline {section}{\numberline {6}Discussion}{7}{section.6}%
-\contentsline {section}{\numberline {7}Conclusion}{7}{section.7}%
-\contentsline {section}{\numberline {8}Appendix}{7}{section.8}%
+\contentsline {section}{\numberline {5}Conclusion}{8}{section.5}%
+\contentsline {section}{\numberline {6}Appendix}{8}{section.6}%
