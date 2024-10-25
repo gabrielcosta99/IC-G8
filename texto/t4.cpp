@@ -6,7 +6,7 @@
 #include <map>
 #include <sstream>
 #include <boost/locale.hpp>
-
+#include <time.h>
 #include "matplotlibcpp.h"
 
 using namespace std;
@@ -39,14 +39,14 @@ vector<pair<wstring, double>> sortMap(map<wstring, double> &M)
 }
 
 
-double calcEntropy(map<wstring, double> charMap){
-    double entropy = 0.0;
-    for(const auto &pair: charMap){
-        double px = pair.second;
-        entropy-= px * log2(px);
-    }
-    return entropy;
-}
+// double calcEntropy(map<wstring, double> charMap){
+//     double entropy = 0.0;
+//     for(const auto &pair: charMap){
+//         double px = pair.second;
+//         entropy-= px * log2(px);
+//     }
+//     return entropy;
+// }
 
 
 int runT4(int argc, char *argv[])
@@ -63,17 +63,12 @@ int runT4(int argc, char *argv[])
 
     wstring line;
     int nWords = 0;
+    clock_t t = clock();
+
     while (getline(file, line))
     {
         // convert the line to lowercase
         line = boost::locale::to_lower(line, boost::locale::generator().generate(""));
-
-        // Create a C locale object (locale_t) to later check if a character is a letter
-        locale_t c_locale = newlocale(LC_ALL_MASK, "en_US.UTF-8", nullptr);
-
-        // Convert wstring to string
-        // wstring_convert<codecvt_utf8<wchar_t>> converter;
-        // string utf8_line = converter.to_bytes(line);
 
         wstringstream ss(line);
         wstring word;
@@ -106,7 +101,7 @@ int runT4(int argc, char *argv[])
                     lowerWord = L"";
                     break;
                 }
-                else if(iswalpha_l(ch,c_locale) || (ch == L'-' && lowerWord.length()>0)){ // if the character is a letter, or if it is an "-" like in "trata-se", add the character to the word
+                else if(iswalpha(ch) || (ch == L'-' && lowerWord.length()>0)){ // if the character is a letter, or if it is an "-" like in "trata-se", add the character to the word
                     lowerWord += ch;
                 }else{ // if the word contains non-letters, skip the word
                     lowerWord = L"";
@@ -121,8 +116,11 @@ int runT4(int argc, char *argv[])
                 nWords += 1;
             }
         }
-        freelocale(c_locale);
     }
+    t = clock() - t;
+    printf("It took %7.3f seconds to calculate the character frequency \n",(double)t / (double)CLOCKS_PER_SEC);
+   
+
     // initiate the sorted map
     vector<pair<wstring, double>> sortedMap = sortMap(wordMap);
 
@@ -141,34 +139,23 @@ int runT4(int argc, char *argv[])
         if(count == 15)
             break;
         words.push_back(converter.to_bytes(p.first));
-        // frequencies.push_back((double)(p.second / nWords));      // used to make a bar graph
         indices.push_back(index++); // Generate numeric index for each character
+        
         // For histogram, add the character multiple times based on its frequency
         for (int i = 0; i < p.second; i++) {
             rawCharacterData.push_back(converter.to_bytes(p.first)); // Use the numeric value of the character
             // wcout << L"Inserting word: \"" << p.first << L"\" Frequency: " << p.second << endl;
         }
-
         count++;
     }
-
-   
+    
     if (indices.empty() || words.empty()) {
         cerr << "Error: No valid words to plot." << endl;
         return 1;
     }
 
-    // for (const std::string& str : rawCharacterData) {
-    //     wcout << str.c_str() << endl;  // Use .c_str() to convert std::string to C-style string
-    // }
-    // for (size_t i = 0; i < rawCharacterData.size(); ++i) {
-    //     wcout << L"Word: " << rawCharacterData[i].c_str() << endl;
-    // }
-    plt::hist(rawCharacterData,15);
-    // plt::bar(indices,frequencies);
 
-    // Set the x-axis labels to words
-    // plt::xticks(indices, words);
+    plt::hist(rawCharacterData,15);
 
     // Add labels and title
     plt::xlabel("Words");
@@ -178,15 +165,12 @@ int runT4(int argc, char *argv[])
     // Display the plot
     plt::show();
 
-    // wcout << "Character frequencies" << endl;
-    // for (auto it = wordMap.begin(); it != wordMap.end(); ++it)
-    //     wcout << it->first << " = " << (double)it->second  << endl;
-    
+    cout << "Character frequencies" << endl;
+    for (auto it = wordMap.begin(); it != wordMap.end(); ++it)
+        cout << converter.to_bytes(it->first) << " = " << (double)it->second  << endl;
+    cout << "Total number of Words: " << nWords << endl; 
 
-     // calculate the probability of each word appearing and store it in the map
-    // for(const auto &pair : wordMap){
-    //     wordMap[pair.first] = pair.second/nWords;
-    // }
+
     // double entropy = calcEntropy(wordMap);
     // wcout << L"entropy: " << entropy << endl;
 

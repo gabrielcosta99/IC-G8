@@ -15,17 +15,16 @@ int runT2(int argc, char *argv[]){
     vector<string> lines;
     string line;
     while(getline(file,line)){
-        line = boost::locale::to_lower(line, boost::locale::generator().generate(""));
-        string lowerline = "";
-        for(char ch: line){
-            if(ispunct(ch))
-                continue;
-            lowerline+=ch;
-
+        string lowerline = boost::locale::to_lower(line, boost::locale::generator().generate(""));
+        string parsedLine = "";
+        for(char ch: lowerline){
+            if(!ispunct(ch))
+                parsedLine+=ch;
         }
-        lines.push_back(lowerline+"\n");
+        lines.push_back(parsedLine+"\n");
 
     }
+    
     for(string l: lines){
         cout << l;
     }

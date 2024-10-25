@@ -6,21 +6,21 @@
 #include <vector>
 #include <map>
 #include <boost/locale.hpp>
-
+#include <time.h>
 #include "matplotlibcpp.h"
 
 using namespace std;
 namespace fs = filesystem;
 namespace plt = matplotlibcpp;
 
-double calcEntropy(map<wchar_t, double> charMap){
-    double entropy = 0.0;
-    for(const auto &pair: charMap){
-        double px = pair.second;
-        entropy-= px * log2(px);
-    }
-    return entropy;
-}
+// double calcEntropy(map<wchar_t, double> charMap){
+//     double entropy = 0.0;
+//     for(const auto &pair: charMap){
+//         double px = pair.second;
+//         entropy-= px * log2(px);
+//     }
+//     return entropy;
+// }
 
 int runT3(int argc, char *argv[]){
 
@@ -33,90 +33,58 @@ int runT3(int argc, char *argv[]){
 
     wstring line;
     int nChars = 0;
+    clock_t t = clock();
     while(getline(file,line)){
         // convert the line to lowercase
-        line = boost::locale::to_lower(line, boost::locale::generator().generate(""));
+        wstring lowerline = boost::locale::to_lower(line, boost::locale::generator().generate(""));
         
-        string lowerline = "";
-        for(wchar_t ch: line){
-         
-            lowerline+=ch;
+        for(wchar_t ch: lowerline){
             // ignore spaces and punctuation
-            if(iswspace(ch) || iswpunct(ch)) 
-                continue;
-
-            charMap[ch] += 1;
-            nChars+=1;
+            if(!iswspace(ch) && !iswpunct(ch)) 
+                charMap[ch] += 1;
+                nChars+=1; 
             
         }
-        // cout << line;
-        // cout << "\n";
 
     }
-    vector<string> characters;
-    vector<string> rawCharacterData; // For histogram
-
-
-    //values needed for a bar graph
-    /*
-    vector<double> frequencies;
-    int index = 0;
-    vector<double> indices;  // Numeric indices for the x-axis
-    */
-    
-    
-    
+    t = clock() - t;
+    printf("It took %7.3f seconds to calculate the character frequency \n",(double)t / (double)CLOCKS_PER_SEC);
+    vector<string> rawCharacterData; // vector that stores each character, a number of times equal to it's frequency
 
     // Converter for wide characters to UTF-8
     wstring_convert<codecvt_utf8<wchar_t>> converter;
 
     for (const auto& p : charMap) {
-        // "p" is the pair (key,value) of the map "charMap"
         
-        characters.push_back(converter.to_bytes(p.first));
-
-        // values needed for a bar graph
-        /*
-        frequencies.push_back((double) p.second);
-        indices.push_back(index++);  // Generate numeric index for each character
-        */
         // For histogram, add the character multiple times based on its frequency
         for (int i = 0; i < p.second; ++i) {
             rawCharacterData.push_back(converter.to_bytes(p.first)); // Use the numeric value of the character
         }
-        charMap[p.first] = (double) (p.second / nChars);
 
     }
 
-    if ( characters.empty()) {
+    if ( rawCharacterData.empty()) {
         cerr << "Error: No valid characters to plot." << endl;
         return 1;
     }
-
-    // for(string c: characters)
-    //     cout << c << endl;
-
+    t = clock() -t;
 
     plt::hist(rawCharacterData,50);
-    // plt::bar(indices,frequencies)
-
-    // Set the x-axis labels to characters
-    // plt::xticks(indices, characters);
 
     // Add labels and title
     plt::xlabel("Characters");
     plt::ylabel("Frequency");
-    plt::title("Character Frequency Bar Chart");
+    plt::title("Character Frequency Histogram");
 
     // Display the plot
     plt::show();
-    
     cout << "Character frequencies" << endl;
     for (const auto &p: charMap)
         cout << converter.to_bytes(p.first) << " = " << p.second << endl;
+    cout << "Total number of Characters: " << nChars << endl; 
     
-    double entropy = calcEntropy(charMap);
-    cout << "entropy: " << entropy << endl;
+    // double entropy = calcEntropy(charMap);
+    // cout << "entropy: " << entropy << endl;
     
     file.close();
     
