@@ -103,7 +103,10 @@ float calculate_snr(const vector<float>& original, const vector<float>& quantize
         float noise = original[i] - quantized[i];
         noise_power += noise * noise;
     }
-    if (noise_power == 0) return INFINITY; // No noise introduced
+    if (noise_power == 0){
+        printf("No noise introduced\n");
+        return INFINITY; // No noise introduced
+    } 
     return 10.0f * log10(signal_power / noise_power); // SNR in decibels (dB)
 }
 

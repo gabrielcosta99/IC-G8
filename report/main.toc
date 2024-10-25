@@ -1,0 +1,18 @@
+\contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
+\contentsline {section}{\numberline {2}Methodology}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Text Data}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Audio Data}{3}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Image Data}{3}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Image Loading}{3}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Image Channel Manipulation}{4}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Grayscale Conversion}{4}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Image Histogram}{5}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Gaussian Blur Filter}{5}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Image Comparison: Quantization, MSE and PSNR}{5}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}Conclusion}{6}{subsection.3.7}%
+\contentsline {section}{\numberline {4}Results}{6}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Text Data}{6}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Audio Data}{6}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Image Data}{7}{subsection.4.3}%
+\contentsline {section}{\numberline {5}Conclusion}{8}{section.5}%
+\contentsline {section}{\numberline {6}Appendix}{8}{section.6}%

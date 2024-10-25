@@ -22,6 +22,7 @@ clean:
 	rm -f t2
 	rm -f t3
 	rm -f t4
+	rm -f t5
 
 # Some notes
 # $@ represents the left side of the ":"
