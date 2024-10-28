@@ -3,15 +3,20 @@
 #include <fstream>
 #include <cstdlib>
 #include <filesystem>
+#include <chrono> // Include chrono for timing
 
 using namespace std;
 namespace fs = filesystem;
+using namespace chrono;
 
-void plot_waveform(const char* data_filename, const char* channel_name, int sampleRate) {
+
+void plot_waveform(const char *data_filename, const char *channel_name, int sampleRate)
+{
     // Open a pipe to gnuplot
-    FILE* gnuplotPipe = popen("gnuplot -persistent", "w");
+    FILE *gnuplotPipe = popen("gnuplot -persistent", "w");
 
-    if (!gnuplotPipe) {
+    if (!gnuplotPipe)
+    {
         cerr << "Error: Could not open pipe to gnuplot." << endl;
         return;
     }
@@ -31,8 +36,10 @@ void plot_waveform(const char* data_filename, const char* channel_name, int samp
     pclose(gnuplotPipe);
 }
 
-int main (int argc, char *argv[]) {
-    if (argc < 2) {
+int main(int argc, char *argv[])
+{
+    if (argc < 2)
+    {
         cout << "Please provide a sound file as an argument." << endl;
         return 1;
     }
@@ -41,7 +48,8 @@ int main (int argc, char *argv[]) {
     SF_INFO sfinfo;
 
     SNDFILE *sf = sf_open(filename, SFM_READ, &sfinfo);
-    if (!sf) {
+    if (!sf)
+    {
         cout << "Error opening the file" << endl;
         return 1;
     }
@@ -56,14 +64,16 @@ int main (int argc, char *argv[]) {
     cout << "Frames: " << frames << endl;
     cout << "Duration: " << duration << " seconds" << endl;
 
-    if (channels != 2) {
+    if (channels != 2)
+    {
         cout << "This example is designed for stereo (2 channels) audio files." << endl;
         sf_close(sf);
         return 1;
     }
+    auto start = high_resolution_clock::now(); // Start timing
 
     int numSamples = frames * channels;
-    float* buffer = new float[numSamples];
+    float *buffer = new float[numSamples];
 
     sf_readf_float(sf, buffer, frames);
 
@@ -71,7 +81,8 @@ int main (int argc, char *argv[]) {
     ofstream leftFile("left_channel.dat");
     ofstream rightFile("right_channel.dat");
 
-    if (!leftFile.is_open() || !rightFile.is_open()) {
+    if (!leftFile.is_open() || !rightFile.is_open())
+    {
         cerr << "Error opening output files." << endl;
         sf_close(sf);
         delete[] buffer;
@@ -79,7 +90,8 @@ int main (int argc, char *argv[]) {
     }
 
     // Write time (in seconds) and amplitude data for left and right channels
-    for (int i = 0; i < frames; i++) {
+    for (int i = 0; i < frames; i++)
+    {
         float time = static_cast<float>(i) / sample_rate;
         float left_sample = buffer[i * 2];      // Left channel
         float right_sample = buffer[i * 2 + 1]; // Right channel
@@ -87,6 +99,12 @@ int main (int argc, char *argv[]) {
         leftFile << time << " " << left_sample << endl;
         rightFile << time << " " << right_sample << endl;
     }
+
+    auto end = high_resolution_clock::now(); // End timing
+
+    // Calculate duration in milliseconds
+    auto durationt = duration_cast<milliseconds>(end - start);
+    cout << "Total execution time: " << durationt.count() << " ms" << endl;
 
     // Close files and cleanup
     leftFile.close();

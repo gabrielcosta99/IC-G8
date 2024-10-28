@@ -6,9 +6,11 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <chrono> // Include chrono for timing
 
 using namespace std;
 namespace fs = filesystem;
+using namespace chrono;
 
 // Function to create improved exponential bins
 vector<int> create_exponential_bins(const vector<float>& data, int num_bins) {
@@ -18,39 +20,44 @@ vector<int> create_exponential_bins(const vector<float>& data, int num_bins) {
     float min_val = *min_element(data.begin(), data.end());
     float max_val = *max_element(data.begin(), data.end());
 
-    // Calculate exponential bin ranges
+    // Calculate refined exponential bin ranges
     vector<float> bin_boundaries(num_bins + 1);
     for (int i = 0; i <= num_bins; ++i) {
-        bin_boundaries[i] = min_val + (max_val - min_val) * (pow(2, float(i) / num_bins) - 1) / (pow(2, 1.0f) - 1);
+        bin_boundaries[i] = min_val + (max_val - min_val) * (pow(2.0f, float(i) / num_bins) - 1) / (pow(2.0f, 1.0f) - 1);
     }
 
-    // Sort the data into bins
+    // Place data into bins
     for (float sample : data) {
         int bin_index = upper_bound(bin_boundaries.begin(), bin_boundaries.end(), sample) - bin_boundaries.begin() - 1;
-        bin_index = min(bin_index, num_bins - 1);  // Ensure we don't exceed bin bounds
+        bin_index = min(bin_index, num_bins - 1);
         histogram[bin_index]++;
+    }
+
+    // Apply smoothing for better appearance
+    for (int i = 1; i < num_bins - 1; ++i) {
+        histogram[i] = (histogram[i - 1] + histogram[i] + histogram[i + 1]) / 3;
     }
 
     return histogram;
 }
 
-// Function to save histogram data to file
-void save_histogram_data(const vector<int>& histogram, const char* filename) {
+// Updated function to save histogram data with amplitude values as x-axis
+void save_histogram_data(const vector<int>& histogram, const vector<float>& bin_boundaries, const char* filename) {
     ofstream file(filename);
     if (!file.is_open()) {
         cerr << "Error opening file: " << filename << endl;
         return;
     }
 
-    // Save histogram data (bin index and count)
+    // Save histogram data (amplitude value and count)
     for (size_t i = 0; i < histogram.size(); ++i) {
-        file << i << " " << histogram[i] << endl;
+        file << bin_boundaries[i] << " " << histogram[i] << endl;
     }
 
     file.close();
 }
 
-// Function to plot histogram using gnuplot
+// Updated plot function to use amplitude as x-axis and frequency as y-axis
 void plot_histogram(const char* data_filename, const char* title) {
     FILE* gnuplotPipe = popen("gnuplot -persistent", "w");
 
@@ -59,36 +66,35 @@ void plot_histogram(const char* data_filename, const char* title) {
         return;
     }
 
-    // Setup gnuplot to plot the histogram with a logarithmic y-axis
+    // Configure gnuplot for logarithmic y-axis (frequency)
     fprintf(gnuplotPipe, "set title '%s'\n", title);
-    fprintf(gnuplotPipe, "set xlabel 'Amplitude (linear scale)'\n");
-    fprintf(gnuplotPipe, "set ylabel 'Frequency'\n");
+    fprintf(gnuplotPipe, "set xlabel 'Amplitude'\n");
+    fprintf(gnuplotPipe, "set ylabel 'Frequency (log scale)'\n");
     fprintf(gnuplotPipe, "set logscale y\n");  // Logarithmic scaling for y-axis
 
-    // Improving the plot style
-    fprintf(gnuplotPipe, "set style fill solid 0.5 border -1\n");  // Set transparency for bars
-    fprintf(gnuplotPipe, "set boxwidth 0.9 relative\n");  // Make boxes wider for better readability
-    fprintf(gnuplotPipe, "set grid ytics lc rgb '#bbbbbb' lw 1 lt 0\n");  // Light grey grid lines
-    fprintf(gnuplotPipe, "set xtics rotate by -45\n");  // Rotate x-ticks for better labeling
-    fprintf(gnuplotPipe, "set xtics 0.05\n"); // Fine xtics for amplitude visibility
+    // Style adjustments for better readability
+    fprintf(gnuplotPipe, "set style fill solid 0.5 border -1\n");
+    fprintf(gnuplotPipe, "set boxwidth 0.9 relative\n");
+    fprintf(gnuplotPipe, "set grid ytics lc rgb '#bbbbbb' lw 1 lt 0\n");
+    fprintf(gnuplotPipe, "set xtics rotate by -45\n");
 
+    // Plot histogram with amplitude values on x-axis
+    fprintf(gnuplotPipe, "plot '%s' using 1:2 with boxes notitle\n", data_filename);
 
-    // Plot with labeled bins and using a color gradient
-    fprintf(gnuplotPipe, "plot '%s' using 1:2:xticlabels(1) with boxes notitle\n", data_filename);
-    
     fflush(gnuplotPipe);
-
     cout << "Press Enter to close the plot for " << title << "...";
     cin.ignore();
 
     pclose(gnuplotPipe);
 }
 
+// Updated main function to use new save_histogram_data with amplitude bin boundaries
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         cout << "Please provide a sound file as an argument." << endl;
         return 1;
     }
+    auto start = high_resolution_clock::now(); // Start timing
 
     const char* filename = argv[1];
     SF_INFO sfinfo;
@@ -133,19 +139,33 @@ int main(int argc, char* argv[]) {
     }
 
     // Parameters for histogram
-    int num_bins = 16;  // Increased number of bins for more amplitude detail
+    int num_bins = 32;  // Increased number of bins for more amplitude detail
 
-    // Create histograms using 
-    vector<int> left_histogram = create_exponential_bins (left_channel, num_bins);
+    // Create exponential bins and bin boundaries
+    vector<int> left_histogram = create_exponential_bins(left_channel, num_bins);
     vector<int> right_histogram = create_exponential_bins(right_channel, num_bins);
     vector<int> mid_histogram = create_exponential_bins(mid_channel, num_bins);
     vector<int> side_histogram = create_exponential_bins(side_channel, num_bins);
 
+    // Generate bin boundaries once (common across channels)
+    float min_val = *min_element(left_channel.begin(), left_channel.end());
+    float max_val = *max_element(left_channel.begin(), left_channel.end());
+    vector<float> bin_boundaries(num_bins + 1);
+    for (int i = 0; i <= num_bins; ++i) {
+        bin_boundaries[i] = min_val + (max_val - min_val) * (pow(2.0f, float(i) / num_bins) - 1) / (pow(2.0f, 1.0f) - 1);
+    }
+
+    auto end = high_resolution_clock::now(); // End timing
+
+    // Calculate duration in milliseconds
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Total execution time: " << duration.count() << " ms" << endl;
+
     // Save histograms to files
-    save_histogram_data(left_histogram, "left_histogram.dat");
-    save_histogram_data(right_histogram, "right_histogram.dat");
-    save_histogram_data(mid_histogram, "mid_histogram.dat");
-    save_histogram_data(side_histogram, "side_histogram.dat");
+    save_histogram_data(left_histogram, bin_boundaries, "left_histogram.dat");
+    save_histogram_data(right_histogram, bin_boundaries, "right_histogram.dat");
+    save_histogram_data(mid_histogram, bin_boundaries, "mid_histogram.dat");
+    save_histogram_data(side_histogram, bin_boundaries, "side_histogram.dat");
 
     // Plot the histograms for left, right, mid, and side channels
     plot_histogram("left_histogram.dat", "Left Channel Amplitude Histogram");

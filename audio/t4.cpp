@@ -6,9 +6,12 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <chrono> // Include chrono for timing
 
 using namespace std;
 namespace fs = filesystem;
+using namespace chrono;
+
 
 // Function to plot waveform using gnuplot
 void plot_waveform(const char* data_filename, const char* title) {
@@ -91,6 +94,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    auto start = high_resolution_clock::now(); // Start timing
+
     const char* filename = argv[1];
     int bit_depth = atoi(argv[2]); // Number of bits for quantization
     SF_INFO sfinfo;
@@ -116,26 +121,29 @@ int main(int argc, char* argv[]) {
 
     sf_readf_float(sf, buffer, frames);
 
-    // Vectors to hold original and quantized data
     vector<float> original_audio(buffer, buffer + numSamples);
     vector<float> quantized_audio = quantize_audio(original_audio, bit_depth);
 
-    // Save waveform data for both original and quantized audio for plotting
+    auto end = high_resolution_clock::now(); // End timing
+
+    // Calculate duration in milliseconds
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Total execution time: " << duration.count() << " ms" << endl;
+
+    cout << "Quantized audio saved to 'quantized_output.wav'" << endl;
+
     save_waveform_data(original_audio, "original_waveform.dat");
     save_waveform_data(quantized_audio, "quantized_waveform.dat");
 
-    // Plot both waveforms
     plot_waveform("original_waveform.dat", "Original Audio Waveform");
     plot_waveform("quantized_waveform.dat", "Quantized Audio Waveform");
 
-    // Save the quantized audio as a new WAV file
     save_quantized_wav("quantized_output.wav", quantized_audio, sample_rate, channels);
 
-    // Cleanup
     sf_close(sf);
     delete[] buffer;
 
-    cout << "Quantized audio saved to 'quantized_output.wav'" << endl;
+
 
     return 0;
 }
