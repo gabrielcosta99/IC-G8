@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <cstdint>
 #include <bitset>
+#include <cassert>
 
 using namespace std;
 namespace fs = filesystem;
@@ -51,7 +52,7 @@ char readBit(string filename){
     if (readBitPos == 0){
         inputFile.get(readBuffer);
         if(inputFile.eof()){
-            printf("Reached the end of the file\n");
+            //printf("Reached the end of the file\n");
             return -1;
         }
             
@@ -61,20 +62,34 @@ char readBit(string filename){
 
     bool bit = (readBuffer & 0x80);
     readBuffer <<= 1;
-    readBitPos--;   
+    readBitPos--;
     
     return bit;
 }
 
-// //Writes an integer value represented by N bits to the file, where 0 < N < 64 .
-// void writeBits(){
+//Writes an integer value represented by N bits to the file, where 0 < N < 64 .
+void writeBits(string filename, int bits, int N){
+    //static_assert(N>0 && N<64, "N must be between 0 and 64");
+    //static_assert(bits != NULL, "bits must not be NULL");
+    int bitsArray[N];
+    for(int i=0; i<N; i++){
+        bitsArray[i] = (bits >> i) & 1;
+    }
+    for(int i=0; i<N; i++){
+        writeBit(filename,bitsArray[i]);
+    }
 
-// }
+}
 
-// // Reads an integer value represented by N bits from the file, where 0 < N < 64 
-// int readBits(){
-
-// }
+// Reads an integer value represented by N bits from the file, where 0 < N < 64 
+int readBits(string filename, int N){
+    //static_assert(N>0 && N<64, "N must be between 0 and 64");
+    int bits[N];
+    for(int i=0; i<N; i++){
+        bits[i] = int(readBit(filename));
+    }
+    return *bits;
+}
 
 // // Writes a string of characters to the file as a series of bits.
 // void writeString(){
