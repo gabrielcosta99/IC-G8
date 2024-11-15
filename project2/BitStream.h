@@ -35,8 +35,8 @@ void writeBit(string filename, bool bit){
 }
 void flush_Bits (void)
 {
-  while (current_bit) 
-    writeBit ("test.bin",0);
+    while (current_bit)
+        writeBit ("test.bin",0);
 }
 
 // Reads a single bit from the file.
