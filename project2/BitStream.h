@@ -71,12 +71,17 @@ char readBit(string filename){
 void writeBits(string filename, int bits, int N){
     //static_assert(N>0 && N<64, "N must be between 0 and 64");
     //static_assert(bits != NULL, "bits must not be NULL");
-    int bitsArray[N];
-    for(int i=0; i<N; i++){
-        bitsArray[i] = (bits >> i) & 1;
+    bool bitsArray[N];
+    for(int i=0; i<=N; i++){
+        bool bit = bits%10;
+        bitsArray[i] = bit;
+        bits = bits/10;
+        // printf("value: %d\n",bit);
     }
-    for(int i=0; i<N; i++){
+    printf("\n\n");
+    for(int i=N-1; i>=0; i--){
         writeBit(filename,bitsArray[i]);
+        printf("bitsArray[i]: %d\n",bitsArray[i]);
     }
 
 }
@@ -84,11 +89,16 @@ void writeBits(string filename, int bits, int N){
 // Reads an integer value represented by N bits from the file, where 0 < N < 64 
 int readBits(string filename, int N){
     //static_assert(N>0 && N<64, "N must be between 0 and 64");
-    int bits[N];
+    int bits = 0;
     for(int i=0; i<N; i++){
-        bits[i] = int(readBit(filename));
+        bits *=10;
+        bool value = readBit(filename);
+        printf("value:%d\n",value);
+        bits += value;
+        printf("bits now: %d\n",bits);
     }
-    return *bits;
+    printf("bits:%d\n",bits);
+    return bits;
 }
 
 // // Writes a string of characters to the file as a series of bits.
