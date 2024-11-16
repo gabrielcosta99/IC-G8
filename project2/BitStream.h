@@ -20,7 +20,7 @@ static ifstream inputFile;
 // Writes a single bit to the file.
 void writeBit(string filename, bool bit){
     bit_buffer <<= 1;
-    bit_buffer |= (bit);
+    bit_buffer |= (bit); // set the last bit to the value of bit
     // printf("bit: %d,  (binary: %s)\n",bit,bitset<8>(bit_buffer).to_string().c_str());
     current_bit++;
     if(current_bit == 8){
@@ -60,7 +60,7 @@ char readBit(string filename){
         // printf("here\n");
     }
 
-    bool bit = (readBuffer & 0x80);
+    bool bit = (readBuffer & 0x80); // get the most significant bit
     readBuffer <<= 1;
     readBitPos--;
     
@@ -68,45 +68,57 @@ char readBit(string filename){
 }
 
 //Writes an integer value represented by N bits to the file, where 0 < N < 64 .
-void writeBits(string filename, int bits, int N){
+void writeBits(string filename, uint64_t bits, int N){
     //static_assert(N>0 && N<64, "N must be between 0 and 64");
     //static_assert(bits != NULL, "bits must not be NULL");
-    bool bitsArray[N];
-    for(int i=0; i<=N; i++){
-        bool bit = bits%10;
-        bitsArray[i] = bit;
-        bits = bits/10;
-        // printf("value: %d\n",bit);
+    
+    for (int i = N - 1; i >= 0; --i) {
+        bool bit = (bits >> i) & 1; // Extract the i-th bit
+        writeBit(filename, bit);
+        //printf("bit: %d\n",bit);
     }
-    printf("\n\n");
-    for(int i=N-1; i>=0; i--){
-        writeBit(filename,bitsArray[i]);
-        printf("bitsArray[i]: %d\n",bitsArray[i]);
-    }
-
 }
 
 // Reads an integer value represented by N bits from the file, where 0 < N < 64 
-int readBits(string filename, int N){
-    //static_assert(N>0 && N<64, "N must be between 0 and 64");
-    int bits = 0;
-    for(int i=0; i<N; i++){
-        bits *=10;
-        bool value = readBit(filename);
-        printf("value:%d\n",value);
-        bits += value;
-        printf("bits now: %d\n",bits);
+// Reads an integer value represented by N bits from the file, where 0 < N <= 64.
+uint64_t readBits(string filename, int N) {
+    assert(N > 0 && N <= 64); // Ensure valid range for N
+
+    uint64_t result = 0; // Initialize result to zero
+
+    for (int i = 0; i < N; ++i) {
+        int bit = readBit(filename);
+        //printf("bit: %d\n",bit);
+        if (bit == -1) {
+            return -1;// End of file
+        }
+        result = (result << 1) | bit; // Shift left and add the current bit
     }
-    printf("bits:%d\n",bits);
-    return bits;
+    //printf("result: %s\n", bitset<8>(result).to_string().c_str());
+    return result;
 }
 
-// // Writes a string of characters to the file as a series of bits.
-// void writeString(){
 
-// }
+// Writes a string of characters to the file as a series of bits.
+void writeString(string filename, string str){
+    for (char c : str) {
+        // convert the character to an 8bit unsigned integer
+        writeBits(filename, c, 8);
+    }
 
-// // Reads a string of characters from the file as a series of bits.
-// string readString(){
+}
 
-// }
+// Reads a string of characters from the file as a series of bits.
+string readString(string filename){
+    string result;
+    while (true)
+    {
+        char c = readBits(filename, 8);
+        //printf("C: %c\n",c);
+        if (c == -1) {
+            break;
+        }
+        result += c;
+    }
+    return result;
+}
