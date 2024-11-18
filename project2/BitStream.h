@@ -25,7 +25,7 @@ public:
         }
     }
 
-    ~BitStream(){
+    void end(){
         file.close();
     }
     // Writes a single bit to the file.

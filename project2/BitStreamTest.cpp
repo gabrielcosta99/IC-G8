@@ -29,7 +29,7 @@ int main(int argc, char* argv[]){
     test1.writeBit(0);
     test1.writeBit(0);
     printf("Passed writeBit\n");
-    test1.~BitStream();
+    test1.end();
 
     BitStream test11("out.bin",true);
     printf("Testing readBit\n");
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]){
     test2.writeBits(0b11110000, 8);
     test2.writeBits(0b00001111, 8);
     printf("Passed writeBits\n");
-    test2.~BitStream();
+    test2.end();
 
     BitStream test21("out2.bin",true);
 
@@ -88,7 +88,7 @@ int main(int argc, char* argv[]){
     test3.writeString("Hello World\n");
     printf("Passed writeString\n");
 
-    test3.~BitStream();
+    test3.end();
     BitStream test31("out3.bin",true);
     printf("Testing readString\n");
     assert(test31.readString() == "Hello World\n");
