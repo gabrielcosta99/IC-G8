@@ -1,4 +1,4 @@
-BitStreamTest:	BitStreamTest.cpp BitStream.h 
+BitStreamTest:	BitStreamTest.cpp BitStream.h Golomb.h
 	g++ -Wall -O2 BitStreamTest.cpp -o BitStreamTest
 
 clean:

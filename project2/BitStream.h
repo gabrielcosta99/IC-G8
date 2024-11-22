@@ -6,6 +6,9 @@
 #include <bitset>
 #include <cassert>
 
+#ifndef BITSTREAM_H
+#define BITSTREAM_H
+
 using namespace std;
 namespace fs = filesystem;
 class BitStream
@@ -26,6 +29,14 @@ public:
     }
 
     void end(){
+        if (current_bit < 8 && current_bit > 0) {
+            // printf("current_bit: %d, ",current_bit);
+            bit_buffer <<= (8 - current_bit); // Pad with zeros
+            file.put(bit_buffer);
+            // printf("buffer: %d\n",bit_buffer);
+            bit_buffer = 0;
+            current_bit = 0;
+        }
         file.close();
     }
     // Writes a single bit to the file.
@@ -136,3 +147,5 @@ public:
         return result;
     }
 };
+
+#endif // BITSTREAM_H

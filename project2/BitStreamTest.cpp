@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "BitStream.h"
+#include "Golomb.h"
 #include <cassert>
 
 using namespace std;
@@ -24,8 +25,6 @@ int main(int argc, char* argv[]){
     test1.writeBit(0);
     test1.writeBit(0);
     test1.writeBit(1);
-    test1.writeBit(0);
-    test1.writeBit(0);
     test1.writeBit(0);
     test1.writeBit(0);
     printf("Passed writeBit\n");
@@ -61,11 +60,13 @@ int main(int argc, char* argv[]){
 
     BitStream test2("out2.bin",false);
 
-    printf("Testing writeBits\n");
+    printf("\nTesting writeBits\n");
     test2.writeBits(0b10101010, 8); 
     test2.writeBits(0b01010101, 8);
     test2.writeBits(0b11110000, 8);
     test2.writeBits(0b00001111, 8);
+    test2.writeBits(0b11111011, 8);
+    test2.writeBits(0b000110, 3);
     printf("Passed writeBits\n");
     test2.end();
 
@@ -76,6 +77,8 @@ int main(int argc, char* argv[]){
     assert(test21.readBits(8) == 0b01010101);
     assert(test21.readBits(8) == 0b11110000);
     assert(test21.readBits(8) == 0b00001111);
+    assert(test21.readBits(8) == 0b11111011);
+    assert(test21.readBits(3) == 0b110);
     printf("Passed readBits\n");
 
     // char filename3[] = "out3.bin";
@@ -84,7 +87,7 @@ int main(int argc, char* argv[]){
 
 
     BitStream test3("out3.bin",false);
-    printf("Testing writeString\n");
+    printf("\nTesting writeString\n");
     test3.writeString("Hello World\n");
     printf("Passed writeString\n");
 
@@ -96,7 +99,23 @@ int main(int argc, char* argv[]){
 
 
 
+
+    printf("\nTesting Golomb\n");
+    Golomb g(8);
+    g.encode(46);
+    // printf("reading: %d\n",bs.readBits(8) == 0b11111011);
+    // printf("final test: %d\n",g.decode());
+    assert(g.decode() == 46);
+    g.end();
+
+    Golomb g2(16);
+    g2.encode(35);
+    assert(g2.decode() == 35);
+    g2.end();
+    printf("Passed Golomb\n");
     printf("\nPassed all tests\n");
+
+    // assert(g.decode() == 45);    
 
     //printf("Testing flush_Bits\n");
 }
