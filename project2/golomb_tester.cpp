@@ -34,7 +34,7 @@ void runGolombTester(const string &inputFile, int m) {
     cout << "Using Golomb parameter m = " << m << endl;
     vector<int> encodedData; // Simulating encoded data for demonstration
     {
-        Golomb encoder(m); // Initialize Golomb encoder with parameter m
+        Golomb encoder(m,false); // Initialize Golomb encoder with parameter m
 
         for (const int &val : originalIntegers) {
             encoder.encode(val); // Encode each value
@@ -46,7 +46,7 @@ void runGolombTester(const string &inputFile, int m) {
     // Step 3: Decode integers
     vector<int> decodedValues;
     {
-        Golomb decoder(m); // Initialize Golomb decoder with parameter m
+        Golomb decoder(m,true); // Initialize Golomb decoder with parameter m
 
         for (size_t i = 0; i < originalIntegers.size(); ++i) {
             int decodedValue = decoder.decode(); // Decode each value

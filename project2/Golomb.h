@@ -21,7 +21,7 @@ class Golomb
     public:
         
 
-        Golomb(int m):m(m) ,bs("golomb.txt",false){};
+        Golomb(int m,bool decoder):m(m) ,bs("golomb.txt",decoder){};
 
         void end(){
             bs.end();

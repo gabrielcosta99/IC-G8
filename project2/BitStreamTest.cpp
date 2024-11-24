@@ -101,17 +101,22 @@ int main(int argc, char* argv[]){
 
 
     printf("\nTesting Golomb\n");
-    Golomb g(8);
-    g.encode(46);
+    Golomb g1(8,false);
+    g1.encode(46);
+    g1.end();
+    Golomb g11(8,true);
     // printf("reading: %d\n",bs.readBits(8) == 0b11111011);
     // printf("final test: %d\n",g.decode());
-    assert(g.decode() == 46);
-    g.end();
+    assert(g11.decode() == 46);
+    g11.end();
 
-    Golomb g2(16);
+    Golomb g2(16,false);
     g2.encode(35);
-    assert(g2.decode() == 35);
     g2.end();
+
+    Golomb g21(16,true);
+    assert(g21.decode() == 35);
+    g21.end();
     printf("Passed Golomb\n");
     printf("\nPassed all tests\n");
 
