@@ -9,3 +9,6 @@ clean:
 
 coder:	coder.cpp BitStream.h
 	g++ -Wall -O2 coder.cpp -o coder
+
+golomb: golomb_tester.cpp Golomb.h
+	g++ -o golomb_tester golomb_tester.cpp

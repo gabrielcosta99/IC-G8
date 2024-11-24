@@ -54,44 +54,46 @@ class Golomb
             return binaryNum;
         }
 
-        void encode(int value){
+        void encode(int value) {
             int q = value / m;
             int r = value % m;
-            int q_bits = q;
-            if (q_bits == 0){
-                bs.writeBit(0);
-            } else {
-                for(int i=0; i < q; i++){
-                    bs.writeBit(1);
-                }   
-                bs.writeBit(0);
-                // bs.writeBit(1);
-                // bs.writeBits(q_bits, q);
-            }
-            uint64_t rBin = decToBinary(r,log2(m));
-            
-            // bs.writeBits(r, m);
-            // printf("q: %d, r: %d, rBits:%ld\n",q,r,rBin);
-            bs.writeBits(rBin, m);
-            bs.end();
-        };
+            int numBitsR = log2(m);
 
-        int decode(){
-            //SHOULD WE CHANGE THIS?
-            BitStream bsRead("golomb.txt",true);
+            cout << "Encoding value: " << value << "\n";
+            //cout << "Quotient (q): " << q << ", Remainder (r): " << r << ", Bits for r: " << numBitsR << "\n";
+
+            // Write q as unary
+            for (int i = 0; i < q; ++i) {
+                bs.writeBit(1);
+            }
+            bs.writeBit(0); // End of unary
+
+            // Write r in binary
+            bs.writeBits(r, numBitsR);
+
+            //cout << "Encoded bits written for r: " << std::bitset<8>(r).to_string() << "\n";
+        }
+
+
+        int decode() {
             int q = 0;
-            while (bsRead.readBit() == 1){
+        
+            // Read unary for q
+            while (bs.readBit() == 1) {
                 q++;
             }
-            if (q == 0){
-                return bsRead.readBits(m);
-            } else {
-                // int q_bits = bsRead.readBits(q);
-                int r = bsRead.readBits(m);
-                // printf("q: %d,  r: %d\n",q,r);
-                return q * m + r;
-            }
-        };
+        
+            // Read binary for r
+            int r = bs.readBits(log2(m));
+        
+            //cout << "Decoded q: " << q << ", Decoded r: " << r << "\n";
+        
+            int value = q * m + r;
+            cout << "Decoded value: " << value << endl;
+        
+            return value;
+        }
+
         void print();
 
 };
