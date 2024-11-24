@@ -7,7 +7,7 @@
 #include <bitset>
 using namespace std;
 
-void runGolombTester(const string &inputFile, int m) {
+void runGolombTester(const string &inputFile, int m, int mode = 0) {
     // Step 1: Read integers from the input file
     ifstream input(inputFile);
     if (!input.is_open()) {
@@ -31,10 +31,10 @@ void runGolombTester(const string &inputFile, int m) {
     cout << endl;
 
     // Step 2: Encode integers (in-memory encoding)
-    cout << "Using Golomb parameter m = " << m << endl;
+    cout << "Using Golomb parameter m = " << m << " and mode = " << (mode == 0 ? "Sign/Magnitude" : "Zigzag Interleaving") << endl;
     vector<int> encodedData; // Simulating encoded data for demonstration
     {
-        Golomb encoder(m,false); // Initialize Golomb encoder with parameter m
+        Golomb encoder(m,false,mode); // Initialize Golomb encoder with parameter m
 
         for (const int &val : originalIntegers) {
             encoder.encode(val); // Encode each value
@@ -46,7 +46,7 @@ void runGolombTester(const string &inputFile, int m) {
     // Step 3: Decode integers
     vector<int> decodedValues;
     {
-        Golomb decoder(m,true); // Initialize Golomb decoder with parameter m
+        Golomb decoder(m,true,mode); // Initialize Golomb decoder with parameter m
 
         for (size_t i = 0; i < originalIntegers.size(); ++i) {
             int decodedValue = decoder.decode(); // Decode each value
@@ -85,15 +85,16 @@ void runGolombTester(const string &inputFile, int m) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        cerr << "Usage: " << argv[0] << " <input_file> <m>\n";
+    if (argc < 4) {
+        cerr << "Usage: " << argv[0] << " <input_file> <m> <mode>\n";
         return 1;
     }
 
     string inputFile = argv[1];
     int m = stoi(argv[2]);
+    int mode = stoi(argv[3]);
 
-    runGolombTester(inputFile, m);
+    runGolombTester(inputFile, m, mode);
 
     return 0;
 }

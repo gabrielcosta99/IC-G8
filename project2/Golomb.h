@@ -14,86 +14,95 @@ using namespace std;
 
 class Golomb
 {
-    private:
-        int m;
-        BitStream bs;
+private:
+    int m;
+    BitStream bs;
+    int mode; // 0 for sign/magnitude, 1 for zigzag interleaving
 
-    public:
-        
+public:
+    Golomb(int m, bool decoder, int mode = 0) : m(m), bs("golomb.txt", decoder), mode(mode) {}
 
-        Golomb(int m,bool decoder):m(m) ,bs("golomb.txt",decoder){};
+    void end()
+    {
+        bs.end();
+    }
+     
+    int zigzagEncode(int value)
+    {
+        return value >= 0 ? 2 * value : -2 * value - 1;
+    }
 
-        void end(){
-            bs.end();
-        };
+    int zigzagDecode(int value)
+    {
+        return (value % 2 == 0) ? (value / 2) : -(value / 2) - 1;
+    }
 
-
-        uint64_t decToBinary(int n, int size) {
-            vector<uint64_t> binaryDigits;
-            uint64_t binaryNum = 0;
-            uint64_t i = 0;
-            // Convert to binary and store each digit in a vector
-            while (n > 0) {
-                uint64_t bit = n % 2;
-                binaryDigits.push_back(bit);
-                n /= 2;
-                i++;
-                size--;
-            }
-            for(; size>0;size--){
-                binaryDigits.push_back(0);
-            }
-
-            // Print binary digits in reverse order
-            for (int j = binaryDigits.size() - 1; j >= 0; j--) {
-                // printf("%ld", binaryDigits[j]);
-                binaryNum = (binaryNum << 1) | binaryDigits[j]; // Construct binary number
-            }
-            // printf("\n");
-
-            return binaryNum;
+    void encode(int value)
+    {
+        if (mode == 0)
+        {
+            // Sign and magnitude
+            bs.writeBit(value < 0); // Write sign bit
+            value = abs(value);
+        }
+        else
+        {
+            // Zigzag interleaving
+            printf("Zigzag encoding\n");
+            value = zigzagEncode(value);
         }
 
-        void encode(int value) {
-            int q = value / m;
-            int r = value % m;
-            int numBitsR = log2(m);
+        int q = value / m;
+        int r = value % m;
+        int numBitsR = log2(m);
 
-            cout << "Encoding value: " << value << "\n";
-            //cout << "Quotient (q): " << q << ", Remainder (r): " << r << ", Bits for r: " << numBitsR << "\n";
-
-            // Write q as unary
-            for (int i = 0; i < q; ++i) {
-                bs.writeBit(1);
-            }
-            bs.writeBit(0); // End of unary
-
-            // Write r in binary
-            bs.writeBits(r, numBitsR);
-
-            //cout << "Encoded bits written for r: " << std::bitset<8>(r).to_string() << "\n";
+        // Write q as unary
+        for (int i = 0; i < q; ++i)
+        {
+            bs.writeBit(1);
         }
+        bs.writeBit(0); // End of unary
 
+        // Write r in binary
+        bs.writeBits(r, numBitsR);
+    }
 
-        int decode() {
-            int q = 0;
-        
+    int decode()
+    {
+        int q = 0;
+
+        if (mode == 0)
+        {
+            // Sign and Magnitude
+            bool isNegative = bs.readBit(); // Read sign bit
+
             // Read unary for q
-            while (bs.readBit() == 1) {
+            while (bs.readBit() == 1)
+            {
                 q++;
             }
-        
+
             // Read binary for r
             int r = bs.readBits(log2(m));
-        
-            //cout << "Decoded q: " << q << ", Decoded r: " << r << "\n";
-        
-            int value = q * m + r;
-            cout << "Decoded value: " << value << endl;
-        
-            return value;
+
+            int magnitude = q * m + r;
+            return isNegative ? -magnitude : magnitude;
         }
+        else
+        {
+            printf("Zigzag decoding\n");
+            // Zigzag Interleaving
+            // Read unary for q
+            while (bs.readBit() == 1)
+            {
+                q++;
+            }
 
-        void print();
+            // Read binary for r
+            int r = bs.readBits(log2(m));
 
+            int zigzagValue = q * m + r;
+            return zigzagDecode(zigzagValue);
+        }
+    }
 };
