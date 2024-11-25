@@ -34,11 +34,12 @@ void runGolombTester(const string &inputFile, int m, int mode = 0) {
     cout << "Using Golomb parameter m = " << m << " and mode = " << (mode == 0 ? "Sign/Magnitude" : "Zigzag Interleaving") << endl;
     vector<int> encodedData; // Simulating encoded data for demonstration
     {
-        Golomb encoder(m,false,mode); // Initialize Golomb encoder with parameter m
+        Golomb encoder(m,false,mode,inputFile); // Initialize Golomb encoder with parameter m
 
-        for (const int &val : originalIntegers) {
-            encoder.encode(val); // Encode each value
-        }
+        // for (const int &val : originalIntegers) {
+        //     encoder.encode(val); // Encode each value
+        // }
+        encoder.encode();
         encoder.end(); // Finalize encoding
     }
     cout << "Encoding completed.\n";
@@ -48,10 +49,12 @@ void runGolombTester(const string &inputFile, int m, int mode = 0) {
     {
         Golomb decoder(m,true,mode); // Initialize Golomb decoder with parameter m
 
-        for (size_t i = 0; i < originalIntegers.size(); ++i) {
-            int decodedValue = decoder.decode(); // Decode each value
-            decodedValues.push_back(decodedValue);
-        }
+        // for (size_t i = 0; i < originalIntegers.size(); ++i) {
+        //     int decodedValue = decoder.decode(); // Decode each value
+        //     decodedValues.push_back(decodedValue);
+        // }
+        decodedValues = decoder.decode();   
+        decoder.end();
     }
     cout << "Decoding completed.\n";
 

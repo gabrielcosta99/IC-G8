@@ -146,6 +146,12 @@ public:
         }
         return result;
     }
+
+    int endOfFile(){
+        if(file.eof())
+            return 1;
+        return 0;
+    }
 };
 
 #endif // BITSTREAM_H
