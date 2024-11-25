@@ -86,7 +86,7 @@ void runGolombTester(const string &inputFile, int m, int mode = 0) {
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
-        cerr << "Usage: " << argv[0] << " <input_file> <m> <mode>\n";
+        cerr << "Usage: " << argv[0] << " <input_file> <m> <mode(0 for Sign/Magnitude)>\n";
         return 1;
     }
 

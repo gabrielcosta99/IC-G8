@@ -54,7 +54,7 @@ public:
 
         int q = value / m;
         int r = value % m;
-        int numBitsR = log2(m);
+        int numBitsR = ceil(log2(m));
 
         // Write q as unary
         for (int i = 0; i < q; ++i)
@@ -83,7 +83,7 @@ public:
             }
 
             // Read binary for r
-            int r = bs.readBits(log2(m));
+            int r = bs.readBits(ceil(log2(m)));
 
             int magnitude = q * m + r;
             return isNegative ? -magnitude : magnitude;
@@ -99,7 +99,7 @@ public:
             }
 
             // Read binary for r
-            int r = bs.readBits(log2(m));
+            int r = bs.readBits(ceil(log2(m)));
 
             int zigzagValue = q * m + r;
             return zigzagDecode(zigzagValue);
