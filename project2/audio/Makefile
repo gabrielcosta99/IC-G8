@@ -23,8 +23,10 @@ test_t1: test_t1.cpp
 clean:
 	rm -f t1
 	rm -f error.bin
-	rm -f reconstructed_stereo.wav
-
+	rm -f inter_error.bin
+	rm -f reconstructed.wav
+	rm -f reconstructed_inter.wav
+	
 # Some notes
 # $@ represents the left side of the ":"
 # $^ represents the right side of the ":"

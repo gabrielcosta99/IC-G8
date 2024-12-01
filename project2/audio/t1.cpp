@@ -3,18 +3,27 @@
 #include <fstream>
 #include <cstdlib>
 #include <filesystem>
-#include <chrono> // Include chrono for timing
+#include <chrono>
+#include <cmath>
 #include "../Golomb.h"
 
-
-#define M_VALUE 32768
+#define DEFAULT_M_VALUE 32768
 
 using namespace std;
 namespace fs = filesystem;
 using namespace chrono;
 
+// Function Prototypes
+void save_wav(const char* output_filename, const vector<int>& data, int sample_rate, int channels);
+int calculate_dynamic_m(const int* buffer, int frames);
+void encode_audio(const int* buffer, int frames, int M, const string& output_file);
+vector<int> decode_audio(int M, const string& input_file, int frames, bool inter_channel = false);
+vector<int> interchannel_encode(const int* buffer, int frames, int M, const string& output_file);
+vector<int> interchannel_decode(int M, const string& input_file, int frames);
+
+// Save WAV file
 void save_wav(const char* output_filename, const vector<int>& data, int sample_rate, int channels) {
-    SF_INFO sfinfo;
+    SF_INFO sfinfo = { 0 };
     sfinfo.samplerate = sample_rate;
     sfinfo.channels = channels;
     sfinfo.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
@@ -29,162 +38,169 @@ void save_wav(const char* output_filename, const vector<int>& data, int sample_r
     sf_close(sf_out);
 }
 
-int main(int argc, char *argv[])
-{
-    if (argc < 2)
-    {
-        cout << "Please provide a sound file as an argument." << endl;
-        cout << "Usage: ./t1 <sample file> [m]" << endl;
+// Calculate dynamic M
+int calculate_dynamic_m(const int* buffer, int frames) {
+    vector<int> prediction_errors;
+    int previous_sample = buffer[0];
+
+    for (int i = 1; i < frames; ++i) {
+        int current_sample = buffer[i];
+        int error = current_sample - previous_sample;
+        prediction_errors.push_back(abs(error));
+        previous_sample = current_sample;
+    }
+
+    double mean_error = 0;
+    for (int error : prediction_errors) {
+        mean_error += error;
+    }
+    mean_error /= prediction_errors.size();
+
+    return (int)pow(2, ceil(log2(mean_error)));
+}
+
+// Encode audio
+void encode_audio(const int* buffer, int frames, int M, const string& output_file) {
+    Golomb encoder(M, false, output_file);
+
+    int previous_left = buffer[0];
+    int previous_right = buffer[1];
+
+    encoder.encode_val(previous_left);
+    encoder.encode_val(previous_right);
+
+    for (int i = 1; i < frames; ++i) {
+        int left_sample = buffer[i * 2];
+        int right_sample = buffer[i * 2 + 1];
+
+        encoder.encode_val(left_sample - previous_left);
+        encoder.encode_val(right_sample - previous_right);
+
+        previous_left = left_sample;
+        previous_right = right_sample;
+    }
+    encoder.end();
+}
+
+// Decode audio
+vector<int> decode_audio(int M, const string& input_file, int frames, bool inter_channel) {
+    Golomb decoder(M, true, input_file);
+    vector<int> errors = decoder.decode();
+    decoder.end();
+
+    vector<int> decoded;
+    int previous_left_sample = errors[0];
+    int previous_right_sample = errors[1];
+
+    decoded.push_back(previous_left_sample);
+    decoded.push_back(previous_right_sample);
+
+    for (size_t i = 2; i < errors.size(); i += 2) {
+        int left_sample = previous_left_sample + errors[i];
+        int right_sample = previous_right_sample + errors[i + 1];
+
+        decoded.push_back(left_sample);
+        decoded.push_back(right_sample);
+
+        previous_left_sample = left_sample;
+        previous_right_sample = right_sample;
+    }
+
+    return decoded;
+}
+
+// Interchannel encode
+vector<int> interchannel_encode(const int* buffer, int frames, int M, const string& output_file) {
+    Golomb encoder(M, false, output_file);
+
+    for (int i = 0; i < frames; ++i) {
+        int left_sample = buffer[i * 2];
+        int right_sample = buffer[i * 2 + 1];
+
+        encoder.encode_val(left_sample);
+        encoder.encode_val(right_sample - left_sample);
+    }
+    encoder.end();
+
+    return {};
+}
+
+// Interchannel decode
+vector<int> interchannel_decode(int M, const string& input_file, int frames) {
+    Golomb decoder(M, true, input_file);
+    vector<int> values = decoder.decode();
+    decoder.end();
+
+    vector<int> decoded;
+    int left_sample = values[0];
+    int right_sample = left_sample + values[1];
+
+    decoded.push_back(left_sample);
+    decoded.push_back(right_sample);
+
+    for (size_t i = 1; i < values.size(); i += 2) {
+        left_sample = values[i];
+        right_sample = left_sample + values[i + 1];
+
+        decoded.push_back(left_sample);
+        decoded.push_back(right_sample);
+    }
+
+    return decoded;
+}
+
+// Main Function
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        cout << "Usage: ./program <audio_file> [M]" << endl;
         return 1;
     }
 
-    const char *filename = argv[1];
-    SF_INFO sfinfo;
+    const char* filename = argv[1];
+    SF_INFO sfinfo = { 0 };
+    SNDFILE* sf = sf_open(filename, SFM_READ, &sfinfo);
 
-    SNDFILE *sf = sf_open(filename, SFM_READ, &sfinfo);
-    if (!sf)
-    {
-        cout << "Error opening the file" << endl;
+    if (!sf) {
+        cerr << "Error opening file: " << filename << endl;
         return 1;
     }
 
     int sample_rate = sfinfo.samplerate;
     int channels = sfinfo.channels;
     int frames = sfinfo.frames;
-    float duration = static_cast<float>(frames) / sample_rate;
 
-    // cout << "Sample rate: " << sample_rate << endl;
-    // cout << "Channels: " << channels << endl;
-    // cout << "Frames: " << frames << endl;
-    // cout << "Duration: " << duration << " seconds" << endl;
-
-    if (channels != 2)
-    {
-        cout << "This example is designed for stereo (2 channels) audio files." << endl;
+    if (channels != 2) {
+        cerr << "This program only supports stereo audio files." << endl;
         sf_close(sf);
         return 1;
     }
-    auto start = high_resolution_clock::now(); // Start timing
 
-    int numSamples = frames * channels;
-    int *buffer = new int[numSamples];
-
+    int* buffer = new int[frames * channels];
     sf_readf_int(sf, buffer, frames);
 
-    // Open files to write the left and right channel data
-    // ofstream leftFile("left_channel.dat");
-    // ofstream rightFile("right_channel.dat");
+    // Calculate or read M
+    int M = (argc < 3) ? calculate_dynamic_m(buffer, frames) : atoi(argv[2]);
+    cout << "Using M: " << M << endl;
 
-    // if (!leftFile.is_open() || !rightFile.is_open())
-    // {
-    //     cerr << "Error opening output files." << endl;
-    //     sf_close(sf);
-    //     delete[] buffer;
-    //     return 1;
-    // }
-    int M;
-    if(argc < 3){
+    auto start = high_resolution_clock::now();
 
-        vector<int> prediction_errors;
-        int previous_sample = buffer[0];
-        for (int i = 1; i < frames; ++i) {
-            int current_sample = buffer[i];
-            int error = current_sample - previous_sample;
-            prediction_errors.push_back(abs(error));
-            previous_sample = current_sample;
-        }
+    // Encoding and decoding
+    encode_audio(buffer, frames, M, "error.bin");
+    vector<int> decoded = decode_audio(M, "error.bin", frames);
 
-        // Calculate the mean absolute error
-        double mean_error = 0;
-        for (int error : prediction_errors) {
-            mean_error += error;
-        }
-        mean_error /= prediction_errors.size();
+    save_wav("reconstructed.wav", decoded, sample_rate, channels);
 
-        // Calculate M dynamically
-        M = (int)pow(2, ceil(log2(mean_error)));
-        cout << "Dynamic M: " << M << endl;
-    }else{
-        int input = atoi(argv[2]);
-        M = (int)pow(2, ceil(log2(input)));
-        cout << "M specified by the user: " << M << endl;
-    }
+    // Interchannel coding
+    interchannel_encode(buffer, frames, M, "inter_error.bin");
+    vector<int> inter_decoded = interchannel_decode(M, "inter_error.bin", frames);
 
-    printf("Encoding the wav file\n");
-    Golomb encoder(M,false,"error.bin");
-    // Golomb right_channel(M_VALUE,false,"right_error.bin");
-    int previous_left_sample = buffer[0];
-    int previous_right_sample = buffer[1];
+    save_wav("reconstructed_inter.wav", inter_decoded, sample_rate, channels);
 
-    encoder.encode_val(previous_left_sample);
-    encoder.encode_val(previous_right_sample);
-    // Write time (in seconds) and amplitude data for left and right channels
-    for (int i = 1; i < frames; i++)
-    {
-        // printf("i:%d\n",i);
-        int left_sample = buffer[i * 2];      // Left channel
-        int right_sample = buffer[i * 2 + 1]; // Right channel
-
-        // Compute the error using the previous sample
-        int left_error = left_sample - previous_left_sample;
-        int right_error = right_sample - previous_right_sample;
-
-        // printf("left:%d, previous_left:%d, left_error: %d, right_error: %d\n",left_sample,previous_left_sample,left_error,right_error);
-
-        // Save the error using Golomb
-        encoder.encode_val(left_error);
-        encoder.encode_val(right_error);
-
-        // update the values
-        previous_left_sample = left_sample;
-        previous_right_sample = right_sample;
-    }
-    encoder.end();
-
-    printf("Decoding...\n");
-    Golomb decoder(M,true,"error.bin");
-
-    vector<int> errors = decoder.decode();
-    decoder.end();
-
-    vector<int> decoded_values;
-    previous_left_sample = errors[0]; // Initial value
-    previous_right_sample = errors[1]; // Initial value
-    decoded_values.push_back(previous_left_sample);
-    decoded_values.push_back(previous_right_sample);
-    int i = 2;
-    for (int error : errors) {
-        if(i%2==0){
-            int original_sample = error + previous_left_sample; // Reconstruct sample
-            decoded_values.push_back(original_sample);
-            previous_left_sample = original_sample;
-        }
-        else{
-            int original_sample = error + previous_right_sample; // Reconstruct sample
-            decoded_values.push_back(original_sample);
-            previous_right_sample = original_sample;
-        }
-        i++;
-    }
-    
-    // vector<int> stereo_data;
-    // for (size_t i = 0; i < decoded.size(); ++i) {
-    //     stereo_data.push_back(left_channel_decoded_values[i]); // Left channel
-    //     stereo_data.push_back(right_channel_decoded_values[i]); // Right channel
-    // }
-    save_wav("reconstructed_stereo.wav", decoded_values, sample_rate, 2);
-
-    auto end = high_resolution_clock::now(); // End timing
-
-    // Calculate duration in milliseconds
-    auto durationt = duration_cast<milliseconds>(end - start);
-    cout << "Total execution time: " << durationt.count() << " ms" << endl;
-
-    // Close files and cleanup
-    // leftFile.close();
-    // rightFile.close();
+    auto end = high_resolution_clock::now();
+    cout << "Execution time: " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
 
     sf_close(sf);
     delete[] buffer;
+
     return 0;
 }
