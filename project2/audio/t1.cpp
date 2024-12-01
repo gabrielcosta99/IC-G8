@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
     if (argc < 2)
     {
         cout << "Please provide a sound file as an argument." << endl;
+        cout << "Usage: ./t1 <sample file> [m]" << endl;
         return 1;
     }
 
@@ -52,10 +53,10 @@ int main(int argc, char *argv[])
     int frames = sfinfo.frames;
     float duration = static_cast<float>(frames) / sample_rate;
 
-    cout << "Sample rate: " << sample_rate << endl;
-    cout << "Channels: " << channels << endl;
-    cout << "Frames: " << frames << endl;
-    cout << "Duration: " << duration << " seconds" << endl;
+    // cout << "Sample rate: " << sample_rate << endl;
+    // cout << "Channels: " << channels << endl;
+    // cout << "Frames: " << frames << endl;
+    // cout << "Duration: " << duration << " seconds" << endl;
 
     if (channels != 2)
     {
@@ -81,18 +82,46 @@ int main(int argc, char *argv[])
     //     delete[] buffer;
     //     return 1;
     // }
+    int M;
+    if(argc < 3){
+
+        vector<int> prediction_errors;
+        int previous_sample = buffer[0];
+        for (int i = 1; i < frames; ++i) {
+            int current_sample = buffer[i];
+            int error = current_sample - previous_sample;
+            prediction_errors.push_back(abs(error));
+            previous_sample = current_sample;
+        }
+
+        // Calculate the mean absolute error
+        double mean_error = 0;
+        for (int error : prediction_errors) {
+            mean_error += error;
+        }
+        mean_error /= prediction_errors.size();
+
+        // Calculate M dynamically
+        M = (int)pow(2, ceil(log2(mean_error)));
+        cout << "Dynamic M: " << M << endl;
+    }else{
+        int input = atoi(argv[2]);
+        M = (int)pow(2, ceil(log2(input)));
+        cout << "M specified by the user: " << M << endl;
+    }
+
     printf("Encoding the wav file\n");
-    Golomb left_channel(M_VALUE,false,"left_error.bin");
-    Golomb right_channel(M_VALUE,false,"right_error.bin");
+    Golomb encoder(M,false,"error.bin");
+    // Golomb right_channel(M_VALUE,false,"right_error.bin");
     int previous_left_sample = buffer[0];
     int previous_right_sample = buffer[1];
 
-    left_channel.encode_val(previous_left_sample);
-    right_channel.encode_val(previous_right_sample);
+    encoder.encode_val(previous_left_sample);
+    encoder.encode_val(previous_right_sample);
     // Write time (in seconds) and amplitude data for left and right channels
     for (int i = 1; i < frames; i++)
     {
-        printf("i:%d\n",i);
+        // printf("i:%d\n",i);
         int left_sample = buffer[i * 2];      // Left channel
         int right_sample = buffer[i * 2 + 1]; // Right channel
 
@@ -103,54 +132,47 @@ int main(int argc, char *argv[])
         // printf("left:%d, previous_left:%d, left_error: %d, right_error: %d\n",left_sample,previous_left_sample,left_error,right_error);
 
         // Save the error using Golomb
-        left_channel.encode_val(left_error);
-        right_channel.encode_val(right_error);
+        encoder.encode_val(left_error);
+        encoder.encode_val(right_error);
 
         // update the values
         previous_left_sample = left_sample;
         previous_right_sample = right_sample;
     }
-    left_channel.end();
-    right_channel.end();
+    encoder.end();
 
-    printf("Decoding the wav file\n");
-    Golomb left_channel_decode(M_VALUE,true,"left_error.bin");
-    Golomb right_channel_decode(M_VALUE,true,"right_error.bin");
+    printf("Decoding...\n");
+    Golomb decoder(M,true,"error.bin");
 
-    vector<int> left_channel_errors = left_channel_decode.decode();
-    left_channel_decode.end();
+    vector<int> errors = decoder.decode();
+    decoder.end();
 
-    vector<int> left_channel_decoded_values;
-    previous_left_sample = left_channel_errors[0]; // Initial value
-    left_channel_decoded_values.push_back(previous_left_sample);
-
-    for (int error : left_channel_errors) {
-        int original_sample = error + previous_left_sample; // Reconstruct sample
-        left_channel_decoded_values.push_back(original_sample);
-        previous_left_sample = original_sample;
+    vector<int> decoded_values;
+    previous_left_sample = errors[0]; // Initial value
+    previous_right_sample = errors[1]; // Initial value
+    decoded_values.push_back(previous_left_sample);
+    decoded_values.push_back(previous_right_sample);
+    int i = 2;
+    for (int error : errors) {
+        if(i%2==0){
+            int original_sample = error + previous_left_sample; // Reconstruct sample
+            decoded_values.push_back(original_sample);
+            previous_left_sample = original_sample;
+        }
+        else{
+            int original_sample = error + previous_right_sample; // Reconstruct sample
+            decoded_values.push_back(original_sample);
+            previous_right_sample = original_sample;
+        }
+        i++;
     }
-    // save_wav("left_channel.wav",left_channel_decoded_values,sample_rate,channels);
     
-
-    vector<int> right_channel_errors = right_channel_decode.decode();
-    right_channel_decode.end();
-    
-    vector<int> right_channel_decoded_values;
-    previous_right_sample = right_channel_errors[0]; // Initial value
-    right_channel_decoded_values.push_back(previous_right_sample);
-
-    for (int error : right_channel_errors) {
-        int original_sample = error + previous_right_sample; // Reconstruct sample
-        right_channel_decoded_values.push_back(original_sample);
-        previous_right_sample = original_sample;
-    }
-    // save_wav("right_channel.wav",right_channel_decoded_values,sample_rate,channels);
-    vector<int> stereo_data;
-    for (size_t i = 0; i < left_channel_decoded_values.size(); ++i) {
-        stereo_data.push_back(left_channel_decoded_values[i]); // Left channel
-        stereo_data.push_back(right_channel_decoded_values[i]); // Right channel
-    }
-    save_wav("reconstructed_stereo.wav", stereo_data, sample_rate, 2);
+    // vector<int> stereo_data;
+    // for (size_t i = 0; i < decoded.size(); ++i) {
+    //     stereo_data.push_back(left_channel_decoded_values[i]); // Left channel
+    //     stereo_data.push_back(right_channel_decoded_values[i]); // Right channel
+    // }
+    save_wav("reconstructed_stereo.wav", decoded_values, sample_rate, 2);
 
     auto end = high_resolution_clock::now(); // End timing
 

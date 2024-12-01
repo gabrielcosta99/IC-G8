@@ -22,7 +22,8 @@ test_t1: test_t1.cpp
 
 clean:
 	rm -f t1
-
+	rm -f error.bin
+	rm -f reconstructed_stereo.wav
 
 # Some notes
 # $@ represents the left side of the ":"
