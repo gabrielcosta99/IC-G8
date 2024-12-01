@@ -22,20 +22,23 @@ private:
     vector<int> originalIntegers;
 
 public:
-    Golomb(int m, bool decoder, int mode = 0, string inputFilename="") : inputFilename(inputFilename), m(m), bs("golomb.txt", decoder), mode(mode) {
+    Golomb(int m, bool decoder,string file="golomb.txt", int mode = 0, string inputFilename="") : inputFilename(inputFilename), m(m), bs(file, decoder), mode(mode) {
         if(decoder == false){
-            ifstream input(inputFilename);
-            if (!input.is_open()) {
-                cerr << "Error: Unable to open input file!" << endl;
-                return;
-            }
+            if(inputFilename != ""){
+                ifstream input(inputFilename);
+                if (!input.is_open()) {
+                    cerr << "Error: Unable to open input file!" << endl;
+                    return;
+                }
 
-            int value;
+                int value;
 
-            while (input >> value) { // Read signed integers directly
-                originalIntegers.push_back(value);
+                while (input >> value) { // Read signed integers directly
+                    originalIntegers.push_back(value);
+                }
+                input.close();
             }
-            input.close();
+            
         }
     }
 
@@ -84,6 +87,37 @@ public:
             bs.writeBits(r, numBitsR);
         }
     }
+
+
+    void encode_val(int value)
+    {
+        if (mode == 0)
+        {
+            // Sign and magnitude
+            bs.writeBit(value < 0); // Write sign bit
+            value = abs(value);
+        }
+        else
+        {
+            // Zigzag interleaving
+            // printf("Zigzag encoding\n");
+            value = zigzagEncode(value);
+        }
+        int q = value / m;
+        int r = value % m;
+        int numBitsR = ceil(log2(m));
+        // Write q as unary
+        for (int i = 0; i < q; ++i)
+        {
+            bs.writeBit(1);
+        }
+        bs.writeBit(0); // End of unary
+
+        // Write r in binary
+        bs.writeBits(r, numBitsR);
+    }
+
+    
 
     vector<int> decode()
     {

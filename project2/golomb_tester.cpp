@@ -34,7 +34,7 @@ void runGolombTester(const string &inputFile, int m, int mode = 0) {
     cout << "Using Golomb parameter m = " << m << " and mode = " << (mode == 0 ? "Sign/Magnitude" : "Zigzag Interleaving") << endl;
     vector<int> encodedData; // Simulating encoded data for demonstration
     {
-        Golomb encoder(m,false,mode,inputFile); // Initialize Golomb encoder with parameter m
+        Golomb encoder(m,false,"golomb.txt",mode,inputFile); // Initialize Golomb encoder with parameter m
 
         // for (const int &val : originalIntegers) {
         //     encoder.encode(val); // Encode each value
@@ -46,16 +46,15 @@ void runGolombTester(const string &inputFile, int m, int mode = 0) {
 
     // Step 3: Decode integers
     vector<int> decodedValues;
-    {
-        Golomb decoder(m,true,mode); // Initialize Golomb decoder with parameter m
+    Golomb decoder(m,true,"golomb.txt", mode); // Initialize Golomb decoder with parameter m
 
-        // for (size_t i = 0; i < originalIntegers.size(); ++i) {
-        //     int decodedValue = decoder.decode(); // Decode each value
-        //     decodedValues.push_back(decodedValue);
-        // }
-        decodedValues = decoder.decode();   
-        decoder.end();
-    }
+    // for (size_t i = 0; i < originalIntegers.size(); ++i) {
+    //     int decodedValue = decoder.decode(); // Decode each value
+    //     decodedValues.push_back(decodedValue);
+    // }
+    decodedValues = decoder.decode();   
+    decoder.end();
+    
     cout << "Decoding completed.\n";
 
     cout << "Decoded values: ";
