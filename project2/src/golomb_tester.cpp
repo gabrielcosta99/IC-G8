@@ -2,7 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include "Golomb.h"
+#include "../include/Golomb.h"
 #include <iomanip> // For std::setw
 #include <bitset>
 using namespace std;

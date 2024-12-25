@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "BitStream.h"
+#include "../include/BitStream.h"
 #include "Golomb.h"
 #include <cassert>
 

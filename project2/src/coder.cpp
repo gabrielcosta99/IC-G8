@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include "BitStream.h" // Assuming the above code is in BitStream.h
+#include "../include/BitStream.h"
 
 using namespace std;
 
