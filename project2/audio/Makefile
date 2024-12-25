@@ -7,9 +7,11 @@ test_t1: test_t1.cpp
 	g++ -Wall $< -o $@ -lsndfile
 
 
-# t2: t2.cpp
-# 	g++ -Wall $< -o $@ -lsndfile
+t2: t2.cpp
+	g++ -Wall $< -o $@ -lsndfile
 
+test: test.cpp
+	g++ -Wall $< -o $@ -lsndfile
 
 # t3: t3.cpp
 # 	g++ -Wall $< -o $@ -lsndfile
@@ -22,6 +24,8 @@ test_t1: test_t1.cpp
 
 clean:
 	rm -f t1
+	rm -f t2
+	rm -f test
 	rm -f error.bin
 	rm -f inter_error.bin
 	rm -f reconstructed.wav

@@ -1,0 +1,4 @@
+[] NÃO ESQUECER DE PENSAR PQ É QUE FAZEMOS CERTAS COISAS (por exemplo, no primeiro projeto pusemos a imagem mais smooth, pq?
+pq assim os valores dos pixeis ficavam mais proximos e desta forma, reduziamos a entropia)
+
+[]
