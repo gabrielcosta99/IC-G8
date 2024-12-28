@@ -1,0 +1,195 @@
+\documentclass[a4paper,14pt]{article}
+
+% Packages
+\usepackage{graphicx}  % For images
+\usepackage{amsmath}   % For math symbols
+\usepackage{hyperref}  % For hyperlinks
+\usepackage{fancyhdr}  % For headers
+\usepackage{geometry}  % For page layout
+\usepackage{xcolor}   % For colors
+\usepackage{listings} % For code snippets
+\usepackage{float}     % For image positioning
+% \usepackage[format=plain,justification=center]{caption}
+\usepackage[utf8]{inputenc} % For special characters
+\geometry{a4paper, margin=1in}
+
+
+% Fancy header/footer settings
+\pagestyle{fancy}
+\fancyfoot[R]{\thepage} % Right-align page number in the footer
+
+
+% Title information
+\title{Lab Report: Text, Audio, and Image Data Manipulation}
+\author{107474-Joseane Pereira \\
+109050-Gabriel Costa \\
+108538-Francisco Gonçalves \\
+Universidade de Aveiro, DETI}
+\date{\today}
+
+
+\begin{document}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.3\linewidth]{ua.pdf}
+    \label{fig:enter-label}
+\end{figure}
+\maketitle
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+This project implements a video codec system using both intra-frame and inter-frame compression techniques. The implementation focuses on efficient compression while maintaining video quality through predictive coding, motion estimation, and Golomb encoding.
+
+\section{System Architecture}
+
+\subsection{Core Components}
+The system consists of four main components:
+\begin{itemize}
+    \item \textbf{BitStream}: Handles bit-level I/O operations for binary file manipulation
+    \item \textbf{Golomb Codec}: Implements Golomb-Rice coding for entropy encoding
+    \item \textbf{Image Codec}: Manages image compression using predictive coding
+    \item \textbf{Video Codecs}: Implements both intra-frame and inter-frame compression
+\end{itemize}
+
+\subsection{Implementation Details}
+
+\subsubsection{BitStream Class}
+Provides low-level bit manipulation:
+\begin{itemize}
+    \item Bit-level read/write operations
+    \item Buffer management for efficient I/O
+    \item Support for variable-length integer encoding
+\end{itemize}
+
+\subsubsection{Golomb Encoding}
+Implements efficient entropy coding:
+\begin{itemize}
+    \item Parameter 'm' optimization for data characteristics
+    \item Support for both signed and unsigned integers
+    \item Zigzag encoding for efficient signed number representation
+\end{itemize}
+
+\subsubsection{Image Codec}
+Features predictive coding techniques:
+\begin{itemize}
+    \item A-type predictor for spatial redundancy reduction
+    \item Multi-channel support for color images
+    \item Residual calculation and reconstruction
+\end{itemize}
+
+\section{Video Compression Techniques}
+
+\subsection{Intra-Frame Coding}
+Implements frame-independent compression:
+\begin{itemize}
+    \item Channel separation for RGB frames
+    \item Predictive coding using spatial correlations
+    \item Single-file storage optimization for all frames
+    \item Metadata management for frame properties
+\end{itemize}
+
+\subsection{Inter-Frame Coding}
+Utilizes temporal redundancy:
+\begin{itemize}
+    \item Motion estimation using block matching
+    \item Configurable block size and search range
+    \item I-frame and P-frame management
+    \item Motion vector encoding and residual compression
+\end{itemize}
+
+\section{Performance Analysis}
+
+\subsection{Compression Efficiency}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Ratio} & \textbf{PSNR} \\
+\hline
+Intra-Frame & X MB & Y MB & Z:1 & W dB \\
+Inter-Frame & X MB & Y MB & Z:1 & W dB \\
+\hline
+\end{tabular}
+\caption{Compression Performance Comparison}
+\end{table}
+
+\subsection{Processing Time}
+\begin{itemize}
+    \item \textbf{Encoding Time}: Analysis of encoding speed per frame
+    \item \textbf{Decoding Time}: Performance metrics for video playback
+    \item \textbf{Motion Estimation}: Impact of block size and search range
+\end{itemize}
+
+\subsection{Quality Assessment}
+Evaluation metrics include:
+\begin{itemize}
+    \item PSNR (Peak Signal-to-Noise Ratio)
+    \item MSE (Mean Squared Error)
+    \item Visual quality comparison
+\end{itemize}
+
+\section{Technical Innovations}
+
+\subsection{Storage Optimization}
+\begin{itemize}
+    \item Single-file approach for all frame data
+    \item Efficient metadata management
+    \item Optimized binary format for frame storage
+\end{itemize}
+
+\subsection{Motion Estimation}
+\begin{itemize}
+    \item Block-based search algorithm
+    \item Adaptive motion vector encoding
+    \item Efficient residual calculation
+\end{itemize}
+
+\section{Future Improvements}
+Potential enhancements include:
+\begin{itemize}
+    \item Advanced prediction modes
+    \item Parallel processing support
+    \item Adaptive Golomb parameter selection
+    \item B-frame implementation
+    \item Rate control mechanisms
+\end{itemize}
+
+\section{Conclusion}
+The implemented video codec system demonstrates effective compression through:
+\begin{itemize}
+    \item Efficient entropy coding using Golomb encoding
+    \item Effective motion estimation and compensation
+    \item Optimized storage mechanisms
+    \item Balance between compression ratio and quality
+\end{itemize}
+
+\appendix
+\section{Implementation Details}
+Key implementation highlights and code snippets:
+
+\subsection{Golomb Encoding Example}
+\begin{lstlisting}[language=C++]
+void encode(int value) {
+    if (mode == 0) {
+        bs.writeBit(value < 0);
+        value = abs(value);
+    } else {
+        value = zigzagEncode(value);
+    }
+    // ... encoding implementation
+}
+\end{lstlisting}
+
+\subsection{Motion Estimation Example}
+\begin{lstlisting}[language=C++]
+Mat calculateResidual(const Mat &current, 
+                     const Mat &reference, 
+                     vector<Point2i> &motionVectors) {
+    // ... motion estimation implementation
+}
+\end{lstlisting}
+
+\end{document}
+
