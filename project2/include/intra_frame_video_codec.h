@@ -1,160 +1,153 @@
-//#ifdef INTRA_FRAME_VIDEO_CODEC_H
-//#define INTRA_FRAME_VIDEO_CODEC_H
-
 #pragma once
-
-#include <opencv2/opencv.hpp>
-#include <iostream>
+#include <string>
+#include <vector>
 #include <fstream>
 #include "Image_codec.h"
-
-
-
-
+#include <opencv2/opencv.hpp>
 
 using namespace cv;
 using namespace std;
 
 class IntraFrameVideoCodec {
 private:
-    int m; // Golomb parameter
-    string videoFilename;
-
-    void writeFrameData(const Mat &frame, Golomb &encoder) {
-        vector<Mat> channels;
-        split(frame, channels);
-        
-        // For each channel
-        for (const Mat &channel : channels) {
-            // Calculate and encode residuals
-            Mat residuals = ImageCodec(m).calculateResiduals(channel);
-            for (int y = 0; y < residuals.rows; ++y) {
-                for (int x = 0; x < residuals.cols; ++x) {
-                    encoder.encode(residuals.at<int>(y, x));
-                }
-            }
+    ImageCodec imageCodec;
+    int width;
+    int height;
+    int frameCount;
+    string format;
+    
+    // Calculate expected frame size in bytes
+    size_t getFrameSize() const {
+        size_t ySize = width * height;
+        size_t uvSize = (width/2) * (height/2);
+        return ySize + 2 * uvSize;
+    }
+    
+    void validateFrame(const Mat& frame) const {
+        if (frame.empty()) {
+            throw runtime_error("Empty frame detected");
+        }
+        if (frame.size() != Size(width, height)) {
+            throw runtime_error("Frame size mismatch");
+        }
+        if (frame.channels() != 3) {
+            throw runtime_error("Invalid number of channels");
         }
     }
 
-    Mat readFrameData(Golomb &decoder, int rows, int cols, int channels) {
-        vector<Mat> decodedChannels(channels);
-        
-        // For each channel
-        for (int c = 0; c < channels; ++c) {
-            Mat residuals = Mat::zeros(Size(cols, rows), CV_32S);
-            // Read residuals
-            for (int y = 0; y < rows; ++y) {
-                for (int x = 0; x < cols; ++x) {
-                    residuals.at<int>(y, x) = decoder.decode_val();
-                }
-            }
-            decodedChannels[c] = ImageCodec(m).reconstructChannel(residuals);
+    Mat readYUVFrame(ifstream& file) {
+        Mat Y(height, width, CV_8UC1);
+        Mat U(height/2, width/2, CV_8UC1);
+        Mat V(height/2, width/2, CV_8UC1);
+
+        if (!file.read(reinterpret_cast<char*>(Y.data), width * height)) {
+            throw runtime_error("Failed to read Y component");
         }
-        
+        if (!file.read(reinterpret_cast<char*>(U.data), (width/2) * (height/2))) {
+            throw runtime_error("Failed to read U component");
+        }
+        if (!file.read(reinterpret_cast<char*>(V.data), (width/2) * (height/2))) {
+            throw runtime_error("Failed to read V component");
+        }
+
+        resize(U, U, Y.size());
+        resize(V, V, Y.size());
+
+        vector<Mat> channels = {Y, U, V};
         Mat frame;
-        merge(decodedChannels, frame);
+        merge(channels, frame);
+        validateFrame(frame);
         return frame;
     }
 
-public:
-    IntraFrameVideoCodec(int golombParam, const string &outputFile)
-        : m(golombParam), videoFilename(outputFile) {}
-
-    void encode(const string &inputVideo) {
-        VideoCapture capture(inputVideo);
-        if (!capture.isOpened()) {
-            cerr << "Error: Unable to open video file: " << inputVideo << endl;
-            return;
-        }
-
-        // Write metadata
-        ofstream metaFile(videoFilename + "_meta.txt");
-        metaFile << capture.get(CAP_PROP_FRAME_WIDTH) << " "
-                 << capture.get(CAP_PROP_FRAME_HEIGHT) << " "
-                 << capture.get(CAP_PROP_FPS) << " "
-                 << capture.get(CAP_PROP_FRAME_COUNT) << " "
-                 << capture.get(CAP_PROP_CHANNEL) << endl;
-        metaFile.close();
-
-        // Create single Golomb encoder for all frames
-        Golomb encoder(m, false, videoFilename + ".bin");
-
-        while (true) {
-            Mat frame;
-            capture >> frame;
-            if (frame.empty()) break;
-            writeFrameData(frame, encoder);
-        }
-
-        encoder.end();
-        capture.release();
-    }
-
-    void decode(const string &outputVideo) {
-        // Read metadata
-        ifstream metaFile(videoFilename + "_meta.txt");
-        int width, height, fps, frameCount, channels;
-        metaFile >> width >> height >> fps >> frameCount >> channels;
-        metaFile.close();
-
-        VideoWriter writer(outputVideo, VideoWriter::fourcc('M','J','P','G'), 
-                         fps, Size(width, height), channels > 1);
-
-        // Create single Golomb decoder for all frames
-        Golomb decoder(m, true, videoFilename + ".bin");
-
-        for (int i = 0; i < frameCount; i++) {
-            Mat frame = readFrameData(decoder, height, width, channels);
-            writer.write(frame);
-        }
-
-        writer.release();
-    }
-
-    void saveCompressedVideo(const string &inputVideo, const string &outputVideo) {
-    VideoCapture capture(inputVideo);
-    if (!capture.isOpened()) {
-        cerr << "Failed to open video file: " << inputVideo << endl;
-        return;
-    }
-
-    int width = capture.get(CAP_PROP_FRAME_WIDTH);
-    int height = capture.get(CAP_PROP_FRAME_HEIGHT);
-    double fps = capture.get(CAP_PROP_FPS);
-    int fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G');
-
-    VideoWriter writer(outputVideo, fourcc, fps, Size(width, height), true);
-    if (!writer.isOpened()) {
-        cerr << "Failed to open output video file: " << outputVideo << endl;
-        return;
-    }
-
-    while (true) {
-        Mat frame;
-        capture >> frame; // Read next frame
-        if (frame.empty())
-            break;
-
-        ImageCodec codec(m);
+    void writeYUVFrame(const Mat& frame, ofstream& file) {
+        validateFrame(frame);
+        
         vector<Mat> channels;
         split(frame, channels);
 
-        for (int i = 0; i < channels.size(); ++i) {
-            Mat residuals = codec.calculateResiduals(channels[i]);
-            channels[i] = codec.reconstructChannel(residuals);
-        }
+        Mat U_small, V_small;
+        resize(channels[1], U_small, Size(width/2, height/2));
+        resize(channels[2], V_small, Size(width/2, height/2));
 
-        Mat compressedFrame;
-        merge(channels, compressedFrame);
-        writer.write(compressedFrame); // Write reconstructed frame
+        if (!file.write(reinterpret_cast<char*>(channels[0].data), width * height)) {
+            throw runtime_error("Failed to write Y component");
+        }
+        if (!file.write(reinterpret_cast<char*>(U_small.data), (width/2) * (height/2))) {
+            throw runtime_error("Failed to write U component");
+        }
+        if (!file.write(reinterpret_cast<char*>(V_small.data), (width/2) * (height/2))) {
+            throw runtime_error("Failed to write V component");
+        }
+        file.flush();
     }
 
-    capture.release();
-    writer.release();
+public:
+    IntraFrameVideoCodec(int m, int width, int height, int frameCount, string format = "420")
+        : imageCodec(m), width(width), height(height), frameCount(frameCount), format(format) {}
 
-    cout << "Compressed video saved to: " << outputVideo << endl;
-}
+    void encode(const string& inputPath, const string& outputPath) {
+        // Ensure input path has .yuv extension
+        string inputFile = inputPath;
+        if (inputFile.substr(inputFile.length() - 4) != ".yuv") {
+            inputFile += ".yuv";
+        }
 
+        ifstream input(inputFile, ios::binary);
+        if (!input.is_open()) {
+            throw runtime_error("Could not open input file: " + inputFile);
+        }
+
+        // Save metadata
+        ofstream metaFile(outputPath + "_meta.txt");
+        metaFile << width << " " << height << " " << frameCount << " " << format << endl;
+        metaFile.close();
+
+        cout << "Processing " << frameCount << " frames..." << endl;
+        
+        for (int frame = 0; frame < frameCount; ++frame) {
+            Mat yuvFrame = readYUVFrame(input);
+            string frameOutputPath = outputPath + "_frame" + to_string(frame);
+            imageCodec.encode(yuvFrame, frameOutputPath);
+            
+            if (frame % 10 == 0) { // Progress indicator
+                cout << "Encoded frame " << frame << "/" << frameCount << endl;
+            }
+        }
+        input.close();
+    }
+
+    void decode(const string& inputPath, const string& outputPath) {
+        // Ensure output path has .yuv extension
+        string outputFile = outputPath;
+        if (outputFile.substr(outputFile.length() - 4) != ".yuv") {
+            outputFile += ".yuv";
+        }
+
+        ifstream metaFile(inputPath + "_meta.txt");
+        if (!metaFile.is_open()) {
+            throw runtime_error("Could not open metadata file: " + inputPath + "_meta.txt");
+        }
+        metaFile >> width >> height >> frameCount >> format;
+        metaFile.close();
+
+        ofstream output(outputFile, ios::binary);
+        if (!output.is_open()) {
+            throw runtime_error("Could not open output file: " + outputFile);
+        }
+
+        cout << "Decoding " << frameCount << " frames..." << endl;
+
+        for (int frame = 0; frame < frameCount; ++frame) {
+            string frameInputPath = inputPath + "_frame" + to_string(frame);
+            Mat decodedFrame = imageCodec.decode(frameInputPath);
+            writeYUVFrame(decodedFrame, output);
+
+            if (frame % 10 == 0) { // Progress indicator
+                cout << "Decoded frame " << frame << "/" << frameCount << endl;
+            }
+        }
+        output.close();
+        cout << "Finished decoding. Output saved to: " << outputFile << endl;
+    }
 };
-
-//#endif // INTRA_FRAME_VIDEO_CODEC_H
