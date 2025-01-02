@@ -61,7 +61,7 @@ void handleIntraFrameVideoCompression(const string &videoPath, const string &out
         cout << "Starting video compression..." << endl;
         cout << "Parameters: " << width << "x" << height << ", " << frameCount << " frames" << endl;
         
-        IntraFrameVideoCodec codec(m, width, height, frameCount, "420");
+        IntraFrameVideoCodec codec(m, width, height, frameCount);
         
         // Encode the video
         cout << "Encoding video..." << endl;
