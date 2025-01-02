@@ -87,4 +87,48 @@ public:
             return zigzagDecode(zigzagValue);
         }
     }
+
+
+    vector<int> decode()
+    {
+        vector<int> decodedValues;
+        while(1){
+            int q = 0;
+            // int decodedValue = decoder.decode(); // Decode each value
+            // decodedValues.push_back(decodedValue);
+            if(bs.endOfFile())
+                break;
+            if (mode == 0)
+            {
+                // Sign and Magnitude
+                bool isNegative = bs.readBit(); // Read sign bit
+
+                // Read unary for q
+                while (bs.readBit() == 1)
+                {
+                    q++;
+                }
+
+                // Read binary for r
+                int r = bs.readBits(ceil(log2(m)));
+                int magnitude = q * m + r;
+                decodedValues.push_back(isNegative ? -magnitude : magnitude);
+            }
+            else
+            {
+                // printf("Zigzag decoding\n");
+                // Zigzag Interleaving
+                // Read unary for q
+                while (bs.readBit() == 1)
+                {
+                    q++;
+                }
+                // Read binary for r
+                int r = bs.readBits(ceil(log2(m)));
+                int zigzagValue = q * m + r;
+                decodedValues.push_back(zigzagDecode(zigzagValue));
+            }
+        }
+        return decodedValues;
+    }
 };

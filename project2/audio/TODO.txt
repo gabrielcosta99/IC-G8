@@ -1,0 +1,2 @@
+[] pq é que tenho de desquantizar o "predict + erro" em vez  de só o "erro" como é suposto?
+[] fazer o codigo para audios mono

@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <chrono>
 #include <cmath>
-#include "../Golomb.h"
+#include "../include/Golomb.h"
 
 #define DEFAULT_M_VALUE 32768
 
@@ -36,7 +36,7 @@ int calculate_dynamic_m(const int16_t* buffer, int frames) {
     vector<int> prediction_errors;
     int previous_sample = buffer[0];
 
-    for (int i = 1; i < frames; ++i) {
+    for (int i = 1; i < frames; i++) {
         int current_sample = buffer[i];
         int error = current_sample - previous_sample;
         prediction_errors.push_back(abs(error));
@@ -70,23 +70,23 @@ void encode_audio(const int16_t* buffer, int frames, int M, const string& output
     Golomb encoder(M, false, output_file);
 
     // Encode first samples (no prediction for these)
-    for (int i = 0; i < predictor_order; ++i) {
-        encoder.encode_val(buffer[i * 2]);     // Left channel
-        encoder.encode_val(buffer[i * 2 + 1]); // Right channel
+    for (int i = 0; i < predictor_order; i++) {
+        encoder.encode(buffer[i * 2]);     // Left channel
+        encoder.encode(buffer[i * 2 + 1]); // Right channel
     }
 
     // Encode residuals with prediction
-    for (int i = predictor_order; i < frames; ++i) {
+    for (int i = predictor_order; i < frames; i++) {
         int left_idx = i * 2;
         int right_idx = i * 2 + 1;
 
         int16_t prediction_left = predict_sample(buffer, left_idx, predictor_order, true);
         int16_t residual_left = buffer[left_idx] - prediction_left;
-        encoder.encode_val(residual_left);
+        encoder.encode(residual_left);
 
         int16_t prediction_right = predict_sample(buffer, right_idx, predictor_order, false);
         int16_t residual_right = buffer[right_idx] - prediction_right;
-        encoder.encode_val(residual_right);
+        encoder.encode(residual_right);
 
         // printf("residual_right: %d, diff_right: %d\n",residual_right,buffer[right_idx]-buffer[right_idx-2]);
     }
@@ -102,13 +102,13 @@ vector<int16_t> decode_audio(int M, const string& input_file, int frames, int pr
     vector<int16_t> decoded;
 
     // Decode first samples directly
-    for (int i = 0; i < predictor_order; ++i) {
+    for (int i = 0; i < predictor_order; i++) {
         decoded.push_back(residuals[i * 2]);     // Left channel
         decoded.push_back(residuals[i * 2 + 1]); // Right channel
     }
 
     // Reconstruct signal using residuals and predictions
-    for (int i = predictor_order; i < frames; ++i) {
+    for (int i = predictor_order; i < frames; i++) {
         int left_idx = i * 2;
         int right_idx = i * 2 + 1;
 
@@ -128,12 +128,12 @@ vector<int16_t> decode_audio(int M, const string& input_file, int frames, int pr
 void interchannel_encode(const int16_t* buffer, int frames, int M, const string& output_file) {
     Golomb encoder(M, false, output_file);
 
-    for (int i = 0; i < frames; ++i) {
+    for (int i = 0; i < frames; i++) {
         int left_sample = buffer[i * 2];
         int right_sample = buffer[i * 2 + 1];
 
-        encoder.encode_val(left_sample);
-        encoder.encode_val(right_sample - left_sample);
+        encoder.encode(left_sample);
+        encoder.encode(right_sample - left_sample);
     }
     encoder.end();
 
@@ -150,12 +150,92 @@ vector<int16_t> interchannel_decode(int M, const string& input_file, int frames)
     int16_t left_sample;
     int16_t right_sample;
 
-    for (size_t i = 0; i < values.size(); i += 2) {
+    for (size_t i = 0; i < values.size()-1; i += 2) {
         left_sample = values[i];
         right_sample = left_sample + values[i + 1];
 
         decoded.push_back(left_sample);
         decoded.push_back(right_sample);
+    }
+
+    return decoded;
+}
+int16_t quantize_sample(int16_t sample, int num_bits) {
+
+    int16_t diff = 16-num_bits;
+    int16_t quantized_sample = sample >> diff;
+
+    return quantized_sample;
+}
+
+int16_t dequantize_sample(int16_t sample, int num_bits) {
+
+    int16_t diff = 16-num_bits;
+    int16_t quantized_sample = sample << diff;
+
+    return quantized_sample;
+}
+
+// Encode audio
+void encode_audio_lossy(const int16_t* buffer, int frames, int M, const string& output_file, int predictor_order, int num_bits) {
+    Golomb encoder(M, false, output_file);
+
+    // Encode first samples (no prediction for these)
+    for (int i = 0; i < predictor_order; i++) {
+        
+        encoder.encode(quantize_sample(buffer[i * 2],num_bits));     // Left channel
+        encoder.encode(quantize_sample(buffer[i * 2 + 1],num_bits)); // Right channel
+    }
+
+    // Encode residuals with prediction
+    for (int i = predictor_order; i < frames; i++) {
+        int left_idx = i * 2;
+        int right_idx = i * 2 + 1;
+
+        int16_t prediction_left = predict_sample(buffer, left_idx, predictor_order, true);
+        int16_t residual_left = buffer[left_idx] - prediction_left;
+        // printf("residual_left: %d\n",residual_left);
+
+        residual_left = quantize_sample(residual_left,num_bits);
+        
+        // printf("residual_left_quantized: %d\n",residual_left);
+        encoder.encode(residual_left);
+
+        int16_t prediction_right = predict_sample(buffer, right_idx, predictor_order, false);
+        int16_t residual_right = buffer[right_idx] - prediction_right;
+
+        residual_right = quantize_sample(residual_right,num_bits);
+        
+        encoder.encode(residual_right);
+
+        // printf("residual_right: %d, diff_right: %d\n",residual_right,buffer[right_idx]-buffer[right_idx-2]);
+    }
+
+    encoder.end();
+}
+
+vector<int16_t> decode_audio_lossy(int M, const string& input_file, int frames, int predictor_order,int num_bits) {
+    Golomb decoder(M, true, input_file);
+    vector<int> residuals = decoder.decode();
+    decoder.end();
+
+    vector<int16_t> decoded;
+    // Decode first samples directly
+    for (int i = 0; i < predictor_order; i++) {
+        decoded.push_back(dequantize_sample(residuals[i * 2],num_bits));     // Left channel
+        decoded.push_back(dequantize_sample(residuals[i * 2 + 1],num_bits) ); // Right channel
+    }
+
+    // Reconstruct signal using residuals and predictions
+    for (int i = predictor_order; i < frames; i++) {
+        int left_idx = i * 2;
+        int right_idx = i * 2 + 1;
+
+        int16_t prediction_left = predict_sample(decoded.data(), left_idx, predictor_order, true);
+        decoded.push_back( dequantize_sample(prediction_left +residuals[left_idx],num_bits));
+
+        int16_t prediction_right = predict_sample(decoded.data(), right_idx, predictor_order, false);
+        decoded.push_back( dequantize_sample(prediction_right + residuals[right_idx],num_bits));
     }
 
     return decoded;
@@ -234,8 +314,15 @@ int main(int argc, char* argv[]) {
 
     } else if(input == "2"){
         cout << "Doing lossy encoding..." << endl;
+        int num_bits;
+        cout << "What is your desired bitrate? ";
+        cin >> num_bits;
         auto start = high_resolution_clock::now();
-        
+        int predictor_order = 3; 
+        encode_audio_lossy(buffer, frames, M, "error_lossy.bin", predictor_order,num_bits);
+        vector<int16_t> decoded = decode_audio_lossy(M, "error_lossy.bin", frames, predictor_order,num_bits);
+
+        save_wav("reconstructed_lossy.wav", decoded, sample_rate, channels);
         
         auto end = high_resolution_clock::now();
         cout << "Execution time: " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
