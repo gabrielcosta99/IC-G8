@@ -293,6 +293,40 @@ private:
         }
     }
 
+        void writeResidualsGolomb(const Mat& residuals, Golomb& golomb) const {
+        for(int y = 0; y < residuals.rows; y++) {
+            for(int x = 0; x < residuals.cols; x++) {
+                golomb.encode(residuals.at<int>(y, x));
+            }
+        }
+    }
+
+    void readResidualsGolomb(Mat& residuals, Golomb& golomb) const {
+        for(int y = 0; y < residuals.rows; y++) {
+            for(int x = 0; x < residuals.cols; x++) {
+                residuals.at<int>(y, x) = golomb.decode_val();
+            }
+        }
+    }
+
+    void writeMotionVectorsGolomb(const vector<Point2i>& motionVectors, Golomb& golomb) const {
+        for(const auto& mv : motionVectors) {
+            golomb.encode(mv.x);
+            golomb.encode(mv.y);
+        }
+    }
+
+    vector<Point2i> readMotionVectorsGolomb(size_t count, Golomb& golomb) const {
+        vector<Point2i> motionVectors;
+        motionVectors.reserve(count);
+        for(size_t i = 0; i < count; i++) {
+            int x = golomb.decode_val();
+            int y = golomb.decode_val();
+            motionVectors.push_back(Point2i(x, y));
+        }
+        return motionVectors;
+    }
+
     Mat decodePFrame(const Mat& referenceFrame, const vector<Point2i>& motionVectors,
                 const vector<bool>& blockModes, const Mat& residuals, int currentBlockSize) const {
         Mat reconstructed = Mat::zeros(referenceFrame.size(), referenceFrame.type());
@@ -345,10 +379,11 @@ private:
 
 public:
     InterFrameVideoCodec(int m, int width, int height, int frameCount,
-                        int iFrameInterval, int blockSize, int searchRange, string format)
+                        int iFrameInterval, int blockSize, int searchRange, 
+                        string format)
         : imageCodec(m), width(width), height(height), frameCount(frameCount),
-          iFrameInterval(iFrameInterval), blockSize(blockSize), searchRange(searchRange),
-          format(format) {
+          iFrameInterval(iFrameInterval), blockSize(blockSize), 
+          searchRange(searchRange), format(format) {
         validateDimensions();
     }
 
@@ -358,6 +393,7 @@ public:
             throw runtime_error("Could not open input file: " + inputPath);
         }
 
+        // Write metadata
         ofstream meta(outputPath + ".meta");
         if (!meta) {
             throw runtime_error("Could not create metadata file");
@@ -367,54 +403,44 @@ public:
              << format << endl;
         meta.close();
 
-        ofstream output(outputPath + ".bin", ios::binary);
-        if (!output) {
-            throw runtime_error("Could not create output file");
-        }
+        // Create Golomb encoder using the m parameter from imageCodec
+        Golomb golomb(imageCodec.getM(), false, outputPath + ".bin", 1);
 
         Mat previousFrame;
-        cout << "Encoding " << frameCount << " frames..." << endl;
-        
         vector<Mat> previousPlanes;
+        
         for (int f = 0; f < frameCount; ++f) {
             vector<Mat> planes = readYUV420Frame(input);
             bool isIFrame = (f % iFrameInterval == 0);
-            output.write(reinterpret_cast<const char*>(&isIFrame), sizeof(bool));
+            golomb.encode(isIFrame ? 1 : 0);
             
             if (isIFrame) {
-                // I-frame encoding remains the same
                 for (int i = 0; i < 3; ++i) {
                     Mat residuals = calculateResidualsWithPrediction(planes[i]);
-                    output.write(reinterpret_cast<const char*>(residuals.data),
-                            residuals.total() * sizeof(int));
+                    writeResidualsGolomb(residuals, golomb);
                 }
                 previousPlanes = planes;
             } else {
-                // P-frame encoding for all three channels
                 for (int i = 0; i < 3; ++i) {
                     vector<Point2i> motionVectors;
                     vector<bool> blockModes;
                     Mat residuals;
                     
-                    int channelWidth = (i == 0) ? width : width/2;
-                    int channelHeight = (i == 0) ? height : height/2;
                     int channelBlockSize = (i == 0) ? blockSize : blockSize/2;
                     
-                    encodePFrame(planes[i], previousPlanes[i], motionVectors, residuals, 
-                            blockModes, channelBlockSize);
+                    encodePFrame(planes[i], previousPlanes[i], motionVectors, 
+                               residuals, blockModes, channelBlockSize);
                     
-                    // Write the number of motion vectors and the vectors themselves
-                    size_t numVectors = motionVectors.size();
-                    output.write(reinterpret_cast<const char*>(&numVectors), sizeof(size_t));
-                    output.write(reinterpret_cast<const char*>(motionVectors.data()),
-                            motionVectors.size() * sizeof(Point2i));
+                    // Write size and data using Golomb coding
+                    golomb.encode(motionVectors.size());
+                    writeMotionVectorsGolomb(motionVectors, golomb);
                     
-                    // Write block modes using the new helper function
-                    writeBlockModes(blockModes, output);
+                    // Write block modes
+                    for(bool mode : blockModes) {
+                        golomb.encode(mode ? 1 : 0);
+                    }
                     
-                    // Write residuals
-                    output.write(reinterpret_cast<const char*>(residuals.data),
-                            residuals.total() * sizeof(int));
+                    writeResidualsGolomb(residuals, golomb);
                 }
                 previousPlanes = planes;
             }
@@ -424,6 +450,7 @@ public:
             }
         }
         
+        golomb.end();
         cout << "Encoding complete" << endl;
     }
 
@@ -432,68 +459,57 @@ public:
         if (!meta) {
             throw runtime_error("Could not open metadata file");
         }
-        meta >> width >> height >> frameCount >> iFrameInterval >> blockSize >> searchRange >> format;
+        meta >> width >> height >> frameCount >> iFrameInterval >> blockSize 
+             >> searchRange >> format;
         meta.close();
         validateDimensions();
 
-        ifstream input(inputPath + ".bin", ios::binary);
+        // Create Golomb decoder using the m parameter from imageCodec
+        Golomb golomb(imageCodec.getM(), true, inputPath + ".bin", 1);
         ofstream output(outputPath, ios::binary);
-        if (!input || !output) {
-            throw runtime_error("Could not open input/output files");
+        if (!output) {
+            throw runtime_error("Could not open output file");
         }
-
-        Mat previousFrame;
-        cout << "Decoding " << frameCount << " frames..." << endl;
 
         vector<Mat> previousPlanes;
         for (int f = 0; f < frameCount; ++f) {
-            bool isIFrame;
-            input.read(reinterpret_cast<char*>(&isIFrame), sizeof(bool));
-            
+            bool isIFrame = golomb.decode_val() == 1;
             vector<Mat> reconstructedPlanes;
             
-        if (isIFrame) {
-                    // I-frame decoding remains the same
-                    for (int i = 0; i < 3; ++i) {
-                        Mat residuals(i == 0 ? height : height/2,
-                                    i == 0 ? width : width/2, CV_32SC1);
-                        input.read(reinterpret_cast<char*>(residuals.data),
-                                residuals.total() * sizeof(int));
-                        reconstructedPlanes.push_back(reconstructChannelWithPrediction(residuals));
-                    }
-                } else {
-                    // P-frame decoding for all three channels
-                    for (int i = 0; i < 3; ++i) {
-                        // Read number of motion vectors
-                        size_t numVectors;
-                        input.read(reinterpret_cast<char*>(&numVectors), sizeof(size_t));
-                        
-                        // Read motion vectors
-                        vector<Point2i> motionVectors(numVectors);
-                        input.read(reinterpret_cast<char*>(motionVectors.data()),
-                                motionVectors.size() * sizeof(Point2i));
-                        
-                        // Read block modes using the new helper function
-                        vector<bool> blockModes;
-                        readBlockModes(blockModes, input);
-                        
-                        // Read residuals
-                        int channelWidth = (i == 0) ? width : width/2;
-                        int channelHeight = (i == 0) ? height : height/2;
-                        int channelBlockSize = (i == 0) ? blockSize : blockSize/2;
-                        Mat residuals(channelHeight, channelWidth, CV_32SC1);
-                        input.read(reinterpret_cast<char*>(residuals.data),
-                                residuals.total() * sizeof(int));
-                        
-                        // Decode the channel
-                        Mat reconstructedChannel = decodePFrame(previousPlanes[i], 
-                                                            motionVectors,
-                                                            blockModes, 
-                                                            residuals,
-                                                            channelBlockSize);
-                        reconstructedPlanes.push_back(reconstructedChannel);
-                    }
+            if (isIFrame) {
+                for (int i = 0; i < 3; ++i) {
+                    Mat residuals(i == 0 ? height : height/2,
+                                i == 0 ? width : width/2, CV_32SC1);
+                    readResidualsGolomb(residuals, golomb);
+                    reconstructedPlanes.push_back(
+                        reconstructChannelWithPrediction(residuals));
                 }
+            } else {
+                for (int i = 0; i < 3; ++i) {
+                    size_t numVectors = golomb.decode_val();
+                    vector<Point2i> motionVectors = 
+                        readMotionVectorsGolomb(numVectors, golomb);
+                    
+                    vector<bool> blockModes;
+                    for(size_t j = 0; j < numVectors; j++) {
+                        blockModes.push_back(golomb.decode_val() == 1);
+                    }
+                    
+                    int channelWidth = (i == 0) ? width : width/2;
+                    int channelHeight = (i == 0) ? height : height/2;
+                    int channelBlockSize = (i == 0) ? blockSize : blockSize/2;
+                    
+                    Mat residuals(channelHeight, channelWidth, CV_32SC1);
+                    readResidualsGolomb(residuals, golomb);
+                    
+                    Mat reconstructedChannel = decodePFrame(previousPlanes[i], 
+                                                          motionVectors,
+                                                          blockModes, 
+                                                          residuals,
+                                                          channelBlockSize);
+                    reconstructedPlanes.push_back(reconstructedChannel);
+                }
+            }
             
             writeYUV420Frame(reconstructedPlanes, output);
             previousPlanes = reconstructedPlanes;
