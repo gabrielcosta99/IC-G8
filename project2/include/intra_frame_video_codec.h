@@ -93,27 +93,59 @@ private:
     }
 
     // Read/Write YUV420p frame methods (unchanged)
-    vector<Mat> readYUV420Frame(ifstream& file) {
-        vector<Mat> planes;
+        int detectFormat(ifstream& file) {
+        file.seekg(0, ios::end);
+        size_t fileSize = file.tellg();
+        file.seekg(0, ios::beg);
+        size_t frameSize = fileSize / frameCount;
+        size_t pixelCount = width * height;
         
+        if (frameSize == pixelCount) return 400;
+        if (frameSize == pixelCount * 1.5) return 420;
+        if (frameSize == pixelCount * 2) return 422;
+        if (frameSize == pixelCount * 3) return 444;
+        throw runtime_error("Unknown YUV format");
+    }
+
+    vector<Mat> readYUV420Frame(ifstream& file) {
+        static int format = -1;
+        if (format == -1) format = detectFormat(file);
+        
+        vector<Mat> planes;
         Mat Y(height, width, CV_8UC1);
-        if (!file.read(reinterpret_cast<char*>(Y.data), getYSize())) {
-            throw runtime_error("Failed to read Y plane");
-        }
+        file.read(reinterpret_cast<char*>(Y.data), width * height);
         planes.push_back(Y);
         
-        Mat U(height/2, width/2, CV_8UC1);
-        if (!file.read(reinterpret_cast<char*>(U.data), getUVSize())) {
-            throw runtime_error("Failed to read U plane");
+        if (format == 400) {
+            planes.push_back(Mat(height/2, width/2, CV_8UC1, Scalar(128)));
+            planes.push_back(Mat(height/2, width/2, CV_8UC1, Scalar(128)));
+            return planes;
         }
+
+        Mat U, V;
+        if (format == 444) {
+            U = Mat(height, width, CV_8UC1);
+            V = Mat(height, width, CV_8UC1);
+            file.read(reinterpret_cast<char*>(U.data), width * height);
+            file.read(reinterpret_cast<char*>(V.data), width * height);
+            resize(U, U, Size(width/2, height/2));
+            resize(V, V, Size(width/2, height/2));
+        } else if (format == 422) {
+            U = Mat(height, width/2, CV_8UC1);
+            V = Mat(height, width/2, CV_8UC1);
+            file.read(reinterpret_cast<char*>(U.data), (width/2) * height);
+            file.read(reinterpret_cast<char*>(V.data), (width/2) * height);
+            resize(U, U, Size(width/2, height/2));
+            resize(V, V, Size(width/2, height/2));
+        } else { // 420
+            U = Mat(height/2, width/2, CV_8UC1);
+            V = Mat(height/2, width/2, CV_8UC1);
+            file.read(reinterpret_cast<char*>(U.data), (width/2) * (height/2));
+            file.read(reinterpret_cast<char*>(V.data), (width/2) * (height/2));
+        }
+        
         planes.push_back(U);
-        
-        Mat V(height/2, width/2, CV_8UC1);
-        if (!file.read(reinterpret_cast<char*>(V.data), getUVSize())) {
-            throw runtime_error("Failed to read V plane");
-        }
         planes.push_back(V);
-        
         return planes;
     }
 
