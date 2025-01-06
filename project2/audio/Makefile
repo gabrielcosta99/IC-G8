@@ -27,7 +27,7 @@ test: test.cpp
 # 	g++ -Wall $< -o $@ -lsndfile
 
 clean:
-	rm -f t1 t2 test
+	rm -f t1 t2 test t2_test
 	rm -f error.bin inter_error.bin error_lossy.bin
 	rm -f reconstructed.wav reconstructed_inter.wav reconstructed_lossy.wav
 	

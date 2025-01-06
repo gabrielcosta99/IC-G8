@@ -162,39 +162,56 @@ vector<int16_t> interchannel_decode(int M, const string& input_file, int frames)
 }
 
 // Quantize samples to a specified number of bits
+// int16_t quantize_sample(int16_t sample, int num_bits) {
+//     int32_t max_val = (1 << 15) - 1; // Max positive value for int16_t
+//     int levels = (1 << num_bits);    // Number of quantization levels
+//     float step_size = (float)(2 * max_val) / levels;
+
+//     // Normalize to [-1.0, 1.0]
+//     float normalized_sample = (float)sample / max_val;
+
+//     // Quantize
+//     float quantized_normalized = round(normalized_sample * (levels / 2 - 1)) / (levels / 2 - 1);
+
+//     // Scale back to int16_t range
+//     int16_t quantized_sample = (int16_t)(quantized_normalized * max_val);
+//     return quantized_sample;
+// }
+
+// int16_t recover_original_sample(int16_t quantized_sample, int num_bits) {
+//     if (num_bits <= 0 || num_bits > 15) {
+//         fprintf(stderr, "Error: num_bits must be in the range [1, 15].\n");
+//         return quantized_sample;
+//     }
+
+//     int32_t max_val = (1 << 15) - 1; // Max positive value for int16_t
+//     int16_t levels = (1 << num_bits);    // Number of quantization levels
+
+//     // Normalize to [-1.0, 1.0]
+//     float normalized_sample = (float)quantized_sample / max_val;
+
+//     // Recover original range
+//     int16_t recovered_sample = round(normalized_sample * (levels / 2 - 1)) / (levels / 2 - 1);
+
+//     return recovered_sample;
+// }
+
 int16_t quantize_sample(int16_t sample, int num_bits) {
-    int32_t max_val = (1 << 15) - 1; // Max positive value for int16_t
-    int levels = (1 << num_bits);    // Number of quantization levels
-    float step_size = (float)(2 * max_val) / levels;
-
-    // Normalize to [-1.0, 1.0]
-    float normalized_sample = (float)sample / max_val;
-
-    // Quantize
-    float quantized_normalized = round(normalized_sample * (levels / 2 - 1)) / (levels / 2 - 1);
-
-    // Scale back to int16_t range
-    int16_t quantized_sample = (int16_t)(quantized_normalized * max_val);
+    int levels = (1 << num_bits) - 1; // Number of quantization levels
+    int16_t normalized_sample = sample + 32768; // Normalize to [0, 65535] (since int16_t ranges from -32768 to 32767)
+    int16_t quantized_sample = (normalized_sample * levels + 32768) / 65536; // Quantize to the nearest level
+    quantized_sample = (quantized_sample * 65536 / levels) - 32768; // Rescale to [-32768, 32767]
     return quantized_sample;
 }
 
+
 int16_t recover_original_sample(int16_t quantized_sample, int num_bits) {
-    if (num_bits <= 0 || num_bits > 15) {
-        fprintf(stderr, "Error: num_bits must be in the range [1, 15].\n");
-        return quantized_sample;
-    }
-
-    int32_t max_val = (1 << 15) - 1; // Max positive value for int16_t
-    int16_t levels = (1 << num_bits);    // Number of quantization levels
-
-    // Normalize to [-1.0, 1.0]
-    float normalized_sample = (float)quantized_sample / max_val;
-
-    // Recover original range
-    int16_t recovered_sample = round(normalized_sample * (levels / 2 - 1)) / (levels / 2 - 1);
-
-    return recovered_sample;
+    int levels = (1 << num_bits) - 1; // Number of quantization levels
+    int16_t normalized_sample = quantized_sample + 32768; // Normalize to [0, 65535]
+    int16_t dequantized_sample = (normalized_sample * 65536 / levels) - 32768; // Rescale to [-32768, 32767]
+    return dequantized_sample;
 }
+
 
 // Encode audio
 void encode_audio_lossy(const int16_t* buffer, int frames, int M, const string& output_file, int predictor_order, int num_bits) {
@@ -254,13 +271,13 @@ vector<int16_t> decode_audio_lossy(int M, const string& input_file, int frames, 
 
         int16_t prediction_left = predict_sample(decoded.data(), left_idx, predictor_order, true);
         // decoded.push_back((residuals[left_idx] + prediction_left) << num_bits_removed);
-        uint16_t original_resiudal_left = recover_original_sample(residuals[left_idx],num_bits);
-        decoded.push_back(original_resiudal_left+prediction_left);     // Left channel
+        uint16_t original_resiudal_left = recover_original_sample(residuals[left_idx]+prediction_left,num_bits);
+        decoded.push_back(original_resiudal_left);     // Left channel
 
         int16_t prediction_right = predict_sample(decoded.data(), right_idx, predictor_order, false);
         // decoded.push_back((residuals[right_idx] + prediction_right) << num_bits_removed);
-        uint16_t original_residual_right = recover_original_sample(residuals[right_idx] ,num_bits);
-        decoded.push_back(original_residual_right+ prediction_right); // Right channel
+        uint16_t original_residual_right = recover_original_sample(residuals[right_idx]+ prediction_right,num_bits);
+        decoded.push_back(original_residual_right); // Right channel
 
         // printf("original_left: %d, original_right:%d\n",original_left,original_right);
     }

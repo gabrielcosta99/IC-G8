@@ -1,0 +1,3 @@
+No relatorio vender o nosso software
+    dizer qual é o dataset que usamos (ex: v1,v2,v3 do site xpto)
+    dizer qual foi o preditor q usamos e pq
