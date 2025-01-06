@@ -209,16 +209,26 @@ int16_t dequantize_sample(int16_t sample, int num_bits) {
 void encode_audio_lossy(int16_t* buffer, int frames, int M, const string& output_file, int predictor_order, int num_bits) {
     Golomb encoder(M, false, output_file);
 
+    // ofstream outfile("encode.txt");
+    // outfile << "ENCODE"<<endl;
+
     // Encode first samples (no prediction for these)
     for (int i = 0; i < predictor_order; i++) {
+        int16_t left_sample = quantize_sample(buffer[i * 2],num_bits);
+        int16_t right_sample = quantize_sample(buffer[i * 2 + 1],num_bits);
+        encoder.encode(left_sample);     // Left channel
+        encoder.encode(right_sample); // Right channel
         
-        encoder.encode(quantize_sample(buffer[i * 2],num_bits));     // Left channel
-        encoder.encode(quantize_sample(buffer[i * 2 + 1],num_bits)); // Right channel
+        // outfile << "left (original | after quant and dequant): " << buffer[i*2] 
+        // << " | " << dequantize_sample(left_sample,num_bits) << endl;
+        buffer[i*2] = dequantize_sample(left_sample,num_bits);
         
-        buffer[i*2] = dequantize_sample(buffer[i*2],num_bits);
-        buffer[i*2+1] = dequantize_sample(buffer[i*2+1],num_bits);
+        // outfile << "right (original | after quant and dequant): " << buffer[i*2+1] 
+        // << " | " << dequantize_sample(right_sample,num_bits) << endl;
+        buffer[i*2+1] = dequantize_sample(right_sample,num_bits);
     }
 
+    
     // Encode residuals with prediction
     for (int i = predictor_order; i < frames; i++) {
         int left_idx = i * 2;
@@ -228,13 +238,19 @@ void encode_audio_lossy(int16_t* buffer, int frames, int M, const string& output
         int16_t residual_left = buffer[left_idx] - prediction_left;
         // printf("residual_left: %d\n",residual_left);
         residual_left = quantize_sample(residual_left,num_bits);
+
+        // outfile << "left (original | after quant and dequant): " << buffer[left_idx] 
+        // << " | " << prediction_left + dequantize_sample(residual_left, num_bits) << endl;
+        encoder.encode(residual_left);
         // printf("residual_left_quantized: %d\n",residual_left);
         buffer[left_idx] = prediction_left+dequantize_sample( residual_left,num_bits);      // alter the buffer position so we dont have the error propagation
-        encoder.encode(residual_left);
-
+        
         int16_t prediction_right = predict_sample(buffer, right_idx, predictor_order, false);
         int16_t residual_right = buffer[right_idx] - prediction_right;
         residual_right = quantize_sample(residual_right,num_bits);
+
+        // outfile << "right (original | after quant and dequant): " << buffer[right_idx] 
+        // << " | " << prediction_right + dequantize_sample(residual_right, num_bits) << endl;
         buffer[right_idx] = prediction_right+dequantize_sample(residual_right,num_bits);      // alter the buffer position so we dont have the error propagation
         encoder.encode(residual_right);
 
@@ -262,17 +278,22 @@ vector<int16_t> decode_audio_lossy(int M, const string& input_file, int frames, 
         decoded.push_back(dequantize_sample(residuals[i * 2],num_bits));     // Left channel
         decoded.push_back(dequantize_sample(residuals[i * 2 + 1],num_bits) ); // Right channel
     }
-
+    // ofstream outfile("decode.txt");
+    // outfile << "DECODE"<<endl;
     // Reconstruct signal using residuals and predictions
     for (int i = predictor_order; i < frames; i++) {
         int left_idx = i * 2;
         int right_idx = i * 2 + 1;
-
+        
         int16_t prediction_left = predict_sample(decoded.data(), left_idx, predictor_order, true);
-        decoded.push_back( prediction_left + dequantize_sample(residuals[left_idx],num_bits));
-
+        int16_t left_sample = prediction_left + dequantize_sample(residuals[left_idx],num_bits);
+        decoded.push_back( left_sample);
+        // outfile << "left: " <<left_sample << " | " << buffer[left_idx] << endl;
+        
         int16_t prediction_right = predict_sample(decoded.data(), right_idx, predictor_order, false);
-        decoded.push_back( prediction_right + dequantize_sample(residuals[right_idx],num_bits));
+        int16_t right_sample = prediction_right + dequantize_sample(residuals[right_idx],num_bits);
+        decoded.push_back(right_sample );
+        // outfile << "right: " <<right_sample << " | " << buffer[right_idx] << endl;
     }
 
     return decoded;
@@ -363,7 +384,7 @@ int main(int argc, char* argv[]) {
         int num_bits;
         cout << "What is your desired bitrate? ";
         cin >> num_bits;
-        int predictor_order = 1; 
+        int predictor_order = 3; 
 
         auto start = high_resolution_clock::now();
         encode_audio_lossy(buffer, frames, M, "error_lossy.bin", predictor_order,num_bits);
