@@ -1,6 +1,8 @@
 #include "../include/Image_codec.h"
 #include "../include/intra_frame_video_codec.h"
 #include "../include/inter_frame_video_codec.h"
+#include "../include/lossy_inter_video_codec.h"
+#include "../include/compare.h"
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <string>
@@ -53,6 +55,10 @@ void handleImageCompression(const string &imagePath, const string &outputPath, i
     codec.saveCompressedImage(image, outputPath);
 
     cout << "Compressed image saved to: " << outputPath << endl;
+
+    // Compare original and compressed files
+    Compare compare;
+    compare.compareFiles(imagePath, outputPath);
 }
 
 void handleIntraFrameVideoCompression(const string &videoPath, const string &outputPath, 
@@ -84,7 +90,30 @@ void handleInterFrameVideoCompression (const string &videoPath, const string &ou
         cout << "Starting video compression..." << endl;
         cout << "Parameters: " << iFrameInterval << " I-frame interval, " << blockSize << " block size, " << searchRange << " search range" << endl;
         
-        InterFrameVideoCodec codec(m, width, height, frameCount, iFrameInterval, blockSize, searchRange, format);
+        InterFrameVideoCodec codec(m, width, height, frameCount, iFrameInterval, blockSize, searchRange);
+        
+        // Encode the video
+        cout << "Encoding video..." << endl;
+        codec.encode(videoPath, outputPath);
+        cout << "Encoding complete." << endl;
+        
+        // Decode the video to verify
+        cout << "Decoding video for verification..." << endl;
+        string decodedPath = outputPath + "_decoded.yuv";
+        codec.decode(outputPath, decodedPath);
+        cout << "Decoding complete. Output saved to: " << decodedPath << endl;
+        
+    } catch (const exception& e) {
+        cerr << "Error during video compression: " << e.what() << endl;
+    }
+}
+
+void handleInterLossyFrameVideoCompression(const string &videoPath, const string &outputPath, int m, int width, int height, int frameCount, int iFrameInterval, int blockSize, int searchRange, int quantizationLevel) {
+    try {
+        cout << "Starting video compression..." << endl;
+        cout << "Parameters: " << iFrameInterval << " I-frame interval, " << blockSize << " block size, " << searchRange << " search range" << endl;
+        
+        InterFrameVideoLossyCodec codec(m, width, height, frameCount, iFrameInterval, blockSize, searchRange, quantizationLevel);
         
         // Encode the video
         cout << "Encoding video..." << endl;
@@ -140,6 +169,7 @@ int main(int argc, char **argv) {
         cerr << "  image_compress <image_path> <output_path>: Compress an image" << endl;
         cerr << "  intra_compress <video_path> <output_path> <width> <height> <frame_count>: Compress a YUV video" << endl;
         cerr << "  inter_compress <video_path> <output_path> <width> <height> <frame_count> <iFrameInterval> <blockSize> <searchRange> <format>: Compress a YUV video" << endl;
+        cerr << " inter_lossy <video_path> <output_path> <width> <height> <frame_count> <iFrameInterval> <blockSize> <searchRange> <quantization>" << endl;
         return -1;
     }
 
@@ -175,10 +205,14 @@ int main(int argc, char **argv) {
         }
         
         handleIntraFrameVideoCompression(inputPath, outputPath, width, height, frameCount, m);
+
+        // Compare original and compressed files
+        Compare compare;
+        compare.compareFiles(inputPath, outputPath + "_decoded.yuv");
     }
     else if (mode == "inter_compress") {
         if (argc < 11) {
-            cerr << "Usage: " << argv[0] << " inter_compress <video_path> <output_path> <width> <height> <frame_count> <iFrameInterval> <blockSize> <searchRange> <format>" << endl;
+            cerr << "Usage: " << argv[0] << " inter_compress <video_path> <output_path> <width> <height> <frame_count> <iFrameInterval> <blockSize> <searchRange>" << endl;
             return -1;
         }
         string outputPath = argv[3];
@@ -188,16 +222,44 @@ int main(int argc, char **argv) {
         int iFrameInterval = stoi(argv[7]);
         int blockSize = stoi(argv[8]);
         int searchRange = stoi(argv[9]);
-        string format = argv[10];
         
         // Validate parameters
         if (width <= 0 || height <= 0 || frameCount <= 0 || iFrameInterval <= 0 || blockSize <= 0 || searchRange <= 0) {
             cerr << "Invalid parameters. Width, height, frame count, I-frame interval, block size, and search range must be positive." << endl;
             return -1;
         }
-        
-        handleInterFrameVideoCompression(inputPath, outputPath, m, width, height, frameCount, iFrameInterval, blockSize, searchRange, format);
+        handleInterFrameVideoCompression(inputPath, outputPath, m, width, height, frameCount, iFrameInterval, blockSize, searchRange, "420");
+
+        // Compare original and compressed files
+        Compare compare;
+        compare.compareFiles(inputPath, outputPath + "_decoded.yuv");
     }
+    else if (mode == "inter_lossy") {
+        if (argc < 11) {
+            cerr << "Usage: " << argv[0] << " inter_lossy <video_path> <output_path> <width> <height> <frame_count> <iFrameInterval> <blockSize> <searchRange> <quantization>" << endl;
+            return -1;
+        }
+        string outputPath = argv[3];
+        int width = stoi(argv[4]);
+        int height = stoi(argv[5]);
+        int frameCount = stoi(argv[6]);
+        int iFrameInterval = stoi(argv[7]);
+        int blockSize = stoi(argv[8]);
+        int searchRange = stoi(argv[9]);
+        int quantizationLevel = stoi(argv[10]);
+        
+        // Validate parameters
+        if (width <= 0 || height <= 0 || frameCount <= 0 || iFrameInterval <= 0 || blockSize <= 0 || searchRange <= 0 || quantizationLevel <= 0) {
+            cerr << "Invalid parameters. Width, height, frame count, I-frame interval, block size, search range, and quantization level must be positive." << endl;
+            return -1;
+        }
+        handleInterLossyFrameVideoCompression(inputPath, outputPath, m, width, height, frameCount, iFrameInterval, blockSize, searchRange, quantizationLevel);
+
+        // Compare original and compressed files
+        Compare compare;
+        compare.compareFiles(inputPath, outputPath + "_decoded.yuv");
+    }
+
     else {
         cerr << "Invalid mode. Use 'image', 'image_compress', or 'intra_compress'." << endl;
         return -1;

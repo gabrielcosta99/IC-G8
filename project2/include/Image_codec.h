@@ -8,12 +8,11 @@
 #include <iostream>
 #include "Golomb.h" // Include the Golomb class for encoding/decoding
 #include <opencv2/opencv.hpp>
-
-
-
+#include <filesystem> // For filesystem operations
 
 using namespace cv;
 using namespace std;
+namespace fs = std::filesystem;
 
 class ImageCodec {
 private:
@@ -28,6 +27,9 @@ private:
         return (x > 0) ? channel.at<uchar>(y, x - 1) : 0;
     }
 public:
+    int getM() const { return m; }
+    
+
     /*
     * Calculate residuals for a single channel using the A predictor
     */
@@ -123,10 +125,12 @@ public:
         }
 
         // Encode all channels to a single file
-        encodeResiduals(residuals, outputFilename + ".bin");
+        string binFilePath = outputFilename + ".bin";
+        encodeResiduals(residuals, binFilePath);
 
         // Save metadata (image dimensions and channels count) for decoding
-        ofstream metaFile(outputFilename + "_meta.txt");
+        string metaFilePath = outputFilename + "_meta.txt";
+        ofstream metaFile(metaFilePath);
         metaFile << image.rows << " " << image.cols << " " << channelsCount << endl;
         metaFile.close();
     }
@@ -138,13 +142,15 @@ public:
      */
     Mat decode(const string &baseFilename) {
         // Read metadata
-        ifstream metaFile(baseFilename + "_meta.txt");
+        string metaFilePath = baseFilename + "_meta.txt";
+        ifstream metaFile(metaFilePath);
         int rows, cols, channels;
         metaFile >> rows >> cols >> channels;
         metaFile.close();
 
         // Decode all channels from single file
-        vector<Mat> residuals = decodeResiduals(cols, rows, channels, baseFilename + ".bin");
+        string binFilePath = baseFilename + ".bin";
+        vector<Mat> residuals = decodeResiduals(cols, rows, channels, binFilePath);
         
         vector<Mat> channelsDecoded(channels);
         for (int i = 0; i < channels; ++i) {
