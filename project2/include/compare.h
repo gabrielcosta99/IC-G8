@@ -5,6 +5,7 @@
 #ifndef COMPARE_H
 #define COMPARE_H
 
+#include <cstdio>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -51,12 +52,16 @@ public:
             }
         }
 
-        // Calculate compression ratio
+        // Calculate compression ratio and error rate
         double compressionRatio = static_cast<double>(compressedSize) / originalSize;
+        double errorRate = (static_cast<double>(differentBits) / totalBits) * 100.0; // Convert to percentage
+
+        printf("\n");
         std::cout << "Original size: " << originalSize << " bytes" << std::endl;
         std::cout << "Compressed size: " << compressedSize << " bytes" << std::endl;
         std::cout << "Compression ratio: " << compressionRatio << std::endl;
-        std::cout << "Bit error rate: " << static_cast<double>(differentBits) / totalBits << std::endl;
+        std::cout << "Bit error rate: " << errorRate << "%" << std::endl; // Display as percentage
+        printf("\n");
     }
 };
 

@@ -26,6 +26,57 @@ private:
     int predictorA(int x, int y, const Mat &channel) {
         return (x > 0) ? channel.at<uchar>(y, x - 1) : 0;
     }
+
+    // Add more JPEG-LS predictors
+    int predictorB(int x, int y, const Mat &channel) {
+        return (y > 0) ? channel.at<uchar>(y - 1, x) : 0;  // North
+    }
+
+    int predictorC(int x, int y, const Mat &channel) {
+        return (x > 0 && y > 0) ? channel.at<uchar>(y - 1, x - 1) : 0;  // Northwest
+    }
+
+    // JPEG-LS predictor
+    int JPEGLSPredictor(int x, int y, const Mat &channel) {
+        if (x == 0 || y == 0) return predictorA(x, y, channel);
+        
+        int a = channel.at<uchar>(y, x - 1);     // West
+        int b = channel.at<uchar>(y - 1, x);     // North
+        int c = channel.at<uchar>(y - 1, x - 1); // Northwest
+
+        // JPEG-LS predictor logic
+        if (c >= max(a, b))
+            return min(a, b);
+        else if (c <= min(a, b))
+            return max(a, b);
+        else
+            return a + b - c;
+    }
+
+    // Optimal predictor selection
+    int predictPixel(int x, int y, const Mat &channel) {
+        if (x == 0 && y == 0) return 128;  // Default value for first pixel
+        if (x == 0) return predictorB(x, y, channel);  // First column: use north
+        if (y == 0) return predictorA(x, y, channel);  // First row: use west
+        
+        return JPEGLSPredictor(x, y, channel);  // Use JPEG-LS predictor for other pixels
+    }
+
+    // Estimate optimal Golomb parameter m
+    int estimateOptimalM(const Mat &residuals) {
+        // Calculate mean absolute value of residuals
+        double sum = 0;
+        for (int y = 0; y < residuals.rows; ++y) {
+            for (int x = 0; x < residuals.cols; ++x) {
+                sum += abs(residuals.at<int>(y, x));
+            }
+        }
+        double mean = sum / (residuals.rows * residuals.cols);
+        
+        // Estimate optimal m based on mean (Rice parameter selection)
+        return max(1, static_cast<int>(ceil(-1/log2(mean/(mean+1)))));
+    }
+
 public:
     int getM() const { return m; }
     
@@ -37,7 +88,7 @@ public:
         Mat residuals = Mat::zeros(channel.size(), CV_32S);
         for (int y = 0; y < channel.rows; ++y) {
             for (int x = 0; x < channel.cols; ++x) {
-                int predicted = predictorA(x, y, channel);
+                int predicted = predictPixel(x, y, channel);
                 residuals.at<int>(y, x) = channel.at<uchar>(y, x) - predicted;
             }
         }
@@ -45,13 +96,13 @@ public:
     }
 
     /*
-    * Reconstruct a single channel using residuals and the A predictor
+    * Reconstruct a single channel using residuals and the JPEG-LS predictor
     */
     Mat reconstructChannel(const Mat &residuals) {
         Mat channel = Mat::zeros(residuals.size(), CV_8U);
         for (int y = 0; y < residuals.rows; ++y) {
             for (int x = 0; x < residuals.cols; ++x) {
-                int predicted = predictorA(x, y, channel);
+                int predicted = predictPixel(x, y, channel); // Use same predictor as encoding
                 int value = residuals.at<int>(y, x) + predicted;
                 channel.at<uchar>(y, x) = saturate_cast<uchar>(value);
             }
@@ -74,6 +125,7 @@ public:
                 }
             }
         }
+        
         encoder.end(); // Finalize and close the file
     }
 
@@ -124,15 +176,32 @@ public:
             residuals[i] = calculateResiduals(channels[i]);
         }
 
-        // Encode all channels to a single file
-        string binFilePath = outputFilename + ".bin";
-        encodeResiduals(residuals, binFilePath);
+        // Get the directory of the output file
+        fs::path outputPath(outputFilename);
+        fs::path outputDir = outputPath.parent_path();
+        string baseFilename = outputDir / outputPath.stem().string();
 
-        // Save metadata (image dimensions and channels count) for decoding
-        string metaFilePath = outputFilename + "_meta.txt";
+        // Calculate optimal m for each channel
+        vector<int> optimalMs(channelsCount);
+        for (int i = 0; i < channelsCount; ++i) {
+            optimalMs[i] = estimateOptimalM(residuals[i]);
+        }
+        
+        // Save metadata including optimal m values
+        string metaFilePath = baseFilename + "_meta.txt";
         ofstream metaFile(metaFilePath);
         metaFile << image.rows << " " << image.cols << " " << channelsCount << endl;
+        for (int m : optimalMs) {
+            metaFile << m << " ";
+        }
         metaFile.close();
+        
+        // Encode each channel with its optimal m
+        for (int i = 0; i < channelsCount; ++i) {
+            string binFilePath = baseFilename + "_" + to_string(i) + ".bin";
+            Golomb encoder(optimalMs[i], false, binFilePath);
+            encodeResiduals({residuals[i]}, binFilePath);
+        }
     }
 
     /*
@@ -166,19 +235,38 @@ public:
         vector<Mat> channels;
         split(image, channels);
 
+        // Get the directory and filename from the output path
+        fs::path outputFilePath(outputPath);
+        fs::path outputDir = outputFilePath.parent_path();
+        string baseName = outputFilePath.stem().string();
+        
+        // Create paths for binary data and metadata
+        string binPath = (outputDir / (baseName + ".bin")).string();
+        string metaPath = (outputDir / (baseName + "_meta.txt")).string();
+
+        // Calculate residuals and save them to binary file
+        vector<Mat> residuals(channels.size());
         for (int i = 0; i < channels.size(); ++i) {
-            Mat residuals = calculateResiduals(channels[i]);
-            channels[i] = reconstructChannel(residuals); // Use the predicted + residuals
+            residuals[i] = calculateResiduals(channels[i]);
+        }
+        encodeResiduals(residuals, binPath);
+
+        // Save metadata
+        ofstream metaFile(metaPath);
+        metaFile << image.rows << " " << image.cols << " " << channels.size() << " " << m << endl;
+        metaFile.close();
+
+        // Decode the binary file to get the reconstructed image
+        vector<Mat> decodedResiduals = decodeResiduals(image.cols, image.rows, channels.size(), binPath);
+        vector<Mat> reconstructedChannels(channels.size());
+        for (int i = 0; i < channels.size(); ++i) {
+            reconstructedChannels[i] = reconstructChannel(decodedResiduals[i]);
         }
 
-        Mat compressedImage;
-        merge(channels, compressedImage);
-
-        imwrite(outputPath, compressedImage); // Save the reconstructed image
+        // Create and save the reconstructed image
+        Mat reconstructedImage;
+        merge(reconstructedChannels, reconstructedImage);
+        imwrite(outputPath, reconstructedImage);
     }
 
-
-
 };
-
-//#endif // DEBUG
