@@ -349,6 +349,50 @@ vector<int16_t> decode_audio_lossy(int M, const string& input_file, int frames, 
     return decoded;
 }
 
+// Helper for lossless encoding
+void perform_lossless_encoding(int16_t *buffer, int frames, int M, int predictor_order, int sample_rate, int channels) {
+    auto start = high_resolution_clock::now();
+    encode_audio(buffer, frames, M, "error.bin", predictor_order);
+    auto end = high_resolution_clock::now();
+    cout << "Lossless encoding completed in " << duration_cast<milliseconds>(end - start).count() << " ms\n";
+
+    start = high_resolution_clock::now();
+    auto decoded = decode_audio(M, "error.bin", frames, predictor_order);
+    end = high_resolution_clock::now();
+    cout << "Lossless decoding completed in " << duration_cast<milliseconds>(end - start).count() << " ms\n";
+
+    save_wav("reconstructed.wav", decoded, sample_rate, channels);
+
+    // Interchannel coding
+    start = high_resolution_clock::now();
+    interchannel_encode(buffer, frames, M, "inter_error.bin");
+    end = high_resolution_clock::now();
+    cout << "Interchannel encoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
+
+    start = high_resolution_clock::now();
+    vector<int16_t> inter_decoded = interchannel_decode(M, "inter_error.bin", frames);
+    end = high_resolution_clock::now();
+    cout << "Interchannel decoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
+
+    save_wav("reconstructed_inter.wav", inter_decoded, sample_rate, channels);
+
+}
+
+// Helper for lossy encoding
+void perform_lossy_encoding(int16_t *buffer, int frames, int M, int predictor_order, int num_bits, int sample_rate, int channels) {
+    auto start = high_resolution_clock::now();
+    encode_audio_lossy(buffer, frames, M, "error_lossy.bin", predictor_order, num_bits);
+    auto end = high_resolution_clock::now();
+    cout << "Lossy encoding completed in " << duration_cast<milliseconds>(end - start).count() << " ms\n";
+
+    start = high_resolution_clock::now();
+    auto decoded = decode_audio_lossy(M, "error_lossy.bin", frames, predictor_order, num_bits);
+    end = high_resolution_clock::now();
+    cout << "Lossy decoding completed in " << duration_cast<milliseconds>(end - start).count() << " ms\n";
+
+    save_wav("reconstructed_lossy.wav", decoded, sample_rate, channels);
+}
+
 // Main Function
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -383,90 +427,45 @@ int main(int argc, char* argv[]) {
     input = cin.get();
     int M;
     bool dynamicM = false;
-    if(input=="y"){
-        cout << endl;
-        cout << "Type a number: ";
-
+    if (input == "y" || input == "Y") {
+        cout << "Enter a number: ";
         cin >> M;
-        M = (int)pow(2, ceil(log2(M)));     // round the number to the nearest power of 2
-    }
-    else{
+        M = (int)pow(2, ceil(log2(M))); // Round to nearest power of 2
+    } else {
         dynamicM = true;
-        // M = calculate_dynamic_m(buffer, frames);
     }
     
 
-    cout << "Would you like to try:"<<endl;
-    cout << "1. Lossless encoding" << endl;
-    cout << "2. Lossy encoding" << endl;
+    cout << "Choose encoding mode:\n"
+         << "1. Lossless encoding\n"
+         << "2. Lossy encoding\n"
+         << "Enter your choice: ";
     cin >> input;
-    bool isLossless;
-    if(input == "1"){
-        cout << "Doing lossless encoding..." << endl;
-    // Encoding and decoding
-        int predictor_order = 3; 
 
-        isLossless = true;
-        if(dynamicM) M = calculate_dynamic_m(buffer, frames,channels, isLossless,predictor_order,0);
-        // Calculate or read M
-        cout << "Using M: " << M << endl;
-        auto start = high_resolution_clock::now();
-        encode_audio(buffer, frames, M, "error.bin", predictor_order);
-        auto end = high_resolution_clock::now();
-        cout << "Intrachannel encoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
+    bool isLossless = (input == "1");
+    int predictor_order = 3; // Default predictor order
+    int num_bits = 16;       // Default number of bits for lossy
 
-        start = high_resolution_clock::now();
-        vector<int16_t> decoded = decode_audio(M, "error.bin", frames, predictor_order);
-        end = high_resolution_clock::now();
-        cout << "Intrachannel decoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
-
-        save_wav("reconstructed.wav", decoded, sample_rate, channels);
-
-        // Interchannel coding
-        start = high_resolution_clock::now();
-        interchannel_encode(buffer, frames, M, "inter_error.bin");
-        end = high_resolution_clock::now();
-        cout << "Interchannel encoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
-
-        start = high_resolution_clock::now();
-        vector<int16_t> inter_decoded = interchannel_decode(M, "inter_error.bin", frames);
-        end = high_resolution_clock::now();
-        cout << "Interchannel decoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
-
-        save_wav("reconstructed_inter.wav", inter_decoded, sample_rate, channels);
-
-    } else if(input == "2"){
-        cout << "Doing lossy encoding..." << endl;
-        int num_bits;
-        cout << "What is your desired bitrate? ";
+    if (!isLossless) {
+        cout << "Enter desired bitrate (number of bits): ";
         cin >> num_bits;
-        int predictor_order = 3; 
-
-        isLossless = false;
-        if(dynamicM) M = calculate_dynamic_m(buffer, frames, channels, isLossless,predictor_order,num_bits);
-        // Calculate or read M
-        cout << "Using M: " << M << endl;
-
-        auto start = high_resolution_clock::now();
-        encode_audio_lossy(buffer, frames, M, "error_lossy.bin", predictor_order,num_bits);
-        auto end = high_resolution_clock::now();
-        cout << "Encoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
-
-        start = high_resolution_clock::now();
-        vector<int16_t> decoded = decode_audio_lossy(M, "error_lossy.bin", frames, predictor_order,num_bits);
-        end = high_resolution_clock::now();
-        cout << "Decoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
-
-        vector<int16_t> original(buffer, buffer + frames * channels);
-        cout << "SNR: " << calculate_snr(original,decoded) << " dB" << endl;
-        
-        save_wav("reconstructed_lossy.wav", decoded, sample_rate, channels);
-        
-        
-
     }
-        sf_close(sf);
-    delete[] buffer;
 
+    if (dynamicM) {
+        M = calculate_dynamic_m(buffer, frames, channels, isLossless, predictor_order, num_bits);
+    }
+
+    cout << "Using M: " << M << endl;
+
+    if (isLossless) {
+        cout << "Performing lossless encoding...\n";
+        perform_lossless_encoding(buffer, frames, M, predictor_order, sample_rate, channels);
+    } else {
+        cout << "Performing lossy encoding...\n";
+        perform_lossy_encoding(buffer, frames, M, predictor_order, num_bits, sample_rate, channels);
+    }
+
+    sf_close(sf);
+    delete[] buffer;
     return 0;
 }
