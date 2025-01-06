@@ -4,17 +4,14 @@
 #include <fstream>
 #include "Image_codec.h"
 #include <opencv2/opencv.hpp>
+#include "inter_frame_video_codec.h"
+
 
 using namespace cv;
 using namespace std;
 
-struct BlockData {
-    bool useIntraMode;
-    Point2i motionVector;
-    Mat residuals;
-};
 
-class InterFrameVideoCodec {
+class InterFrameVideoLossyCodec {
 private:
     ImageCodec imageCodec;
     int width;
@@ -23,6 +20,7 @@ private:
     int iFrameInterval;    // Interval between I-frames
     int blockSize;         // Size of blocks for motion estimation
     int searchRange;       // Search range for motion estimation
+    int quantizationLevel; // Quantization level for lossy compression
 
     // Helper functions from previous implementation
     size_t getYSize() const { return width * height; }
@@ -320,21 +318,6 @@ private:
         }
     }
 
-        void writeResidualsGolomb(const Mat& residuals, Golomb& golomb) const {
-        for(int y = 0; y < residuals.rows; y++) {
-            for(int x = 0; x < residuals.cols; x++) {
-                golomb.encode(residuals.at<int>(y, x));
-            }
-        }
-    }
-
-    void readResidualsGolomb(Mat& residuals, Golomb& golomb) const {
-        for(int y = 0; y < residuals.rows; y++) {
-            for(int x = 0; x < residuals.cols; x++) {
-                residuals.at<int>(y, x) = golomb.decode_val();
-            }
-        }
-    }
 
     void writeMotionVectorsGolomb(const vector<Point2i>& motionVectors, Golomb& golomb) const {
         for(const auto& mv : motionVectors) {
@@ -404,13 +387,42 @@ private:
         return reconstructed;
     }
 
+    Mat quantizeResiduals(const Mat& residuals) const {
+        Mat quantized = residuals / quantizationLevel;
+        return quantized;
+    }
+
+    Mat dequantizeResiduals(const Mat& quantized) const {
+        Mat dequantized = quantized * quantizationLevel;
+        return dequantized;
+    }
+
+    void writeResidualsGolomb(const Mat& residuals, Golomb& golomb) const {
+        Mat quantized = quantizeResiduals(residuals);
+        for(int y = 0; y < quantized.rows; y++) {
+            for(int x = 0; x < quantized.cols; x++) {
+                golomb.encode(quantized.at<int>(y, x));
+            }
+        }
+    }
+
+    void readResidualsGolomb(Mat& residuals, Golomb& golomb) const {
+        Mat quantized(residuals.size(), CV_32SC1);
+        for(int y = 0; y < quantized.rows; y++) {
+            for(int x = 0; x < quantized.cols; x++) {
+                quantized.at<int>(y, x) = golomb.decode_val();
+            }
+        }
+        residuals = dequantizeResiduals(quantized);
+    }
+
 public:
-    InterFrameVideoCodec(int m, int width, int height, int frameCount,
-                        int iFrameInterval, int blockSize, int searchRange 
-                        )
+    InterFrameVideoLossyCodec(int m, int width, int height, int frameCount,
+                    int iFrameInterval, int blockSize, int searchRange,
+                    int quantizationLevel)
         : imageCodec(m), width(width), height(height), frameCount(frameCount),
           iFrameInterval(iFrameInterval), blockSize(blockSize), 
-          searchRange(searchRange) {
+          searchRange(searchRange), quantizationLevel(quantizationLevel) {
         validateDimensions();
     }
 
@@ -427,7 +439,7 @@ public:
         }
         meta << width << " " << height << " " << frameCount << " "
              << iFrameInterval << " " << blockSize << " " << searchRange << " "
-             << endl;
+             << quantizationLevel << endl;
         meta.close();
 
         // Create Golomb encoder using the m parameter from imageCodec
@@ -487,7 +499,7 @@ public:
             throw runtime_error("Could not open metadata file");
         }
         meta >> width >> height >> frameCount >> iFrameInterval >> blockSize 
-             >> searchRange;
+             >> searchRange >> quantizationLevel;
         meta.close();
         validateDimensions();
 
