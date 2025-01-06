@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include "../include/Golomb.h"
 
 #define DEFAULT_M_VALUE 32768
@@ -31,26 +32,7 @@ void save_wav(const char* output_filename, const vector<int16_t>& data, int samp
     sf_close(sf_out);
 }
 
-// Calculate dynamic M
-int calculate_dynamic_m(const int16_t* buffer, int frames) {
-    vector<int> prediction_errors;
-    int previous_sample = buffer[0];
 
-    for (int i = 1; i < frames; i++) {
-        int current_sample = buffer[i];
-        int error = current_sample - previous_sample;
-        prediction_errors.push_back(abs(error));
-        previous_sample = current_sample;
-    }
-
-    double mean_error = 0;
-    for (int error : prediction_errors) {
-        mean_error += error;
-    }
-    mean_error /= prediction_errors.size();
-
-    return (int)pow(2, ceil(log2(mean_error)));
-}
 
 
 double calculate_snr(const std::vector<int16_t>& original, const std::vector<int16_t>& reconstructed) {
@@ -92,6 +74,90 @@ int predict_sample(const int16_t* buffer, int n, int order, bool is_left_channel
     if (order == 4) return buffer[n - step + offset] + (buffer[n - step + offset] - buffer[n - 2*step + offset]);
     return 0; // Default fallback
 }
+
+int16_t quantize_sample(int16_t sample, int num_bits) {
+
+    int16_t diff = 16-num_bits;
+    int16_t quantized_sample = sample >> diff ;
+
+    return quantized_sample;
+}
+
+int16_t dequantize_sample(int16_t sample, int num_bits) {
+
+    int16_t diff = 16-num_bits;
+    int16_t dequantized_sample = sample << diff;
+
+    return dequantized_sample;
+}
+
+// Calculate dynamic M
+int calculate_dynamic_m(int16_t* buffer, int frames,int channels, bool isLossless,int predictor_order,int num_bits) {
+    vector<int16_t> prediction_errors;
+
+    if(isLossless){
+        for (int i = 0; i < predictor_order; i++) {
+            prediction_errors.push_back(buffer[i * 2]);     // Left channel
+            prediction_errors.push_back(buffer[i * 2 + 1]); // Right channel
+        }
+        for (int i = predictor_order; i < frames; i++) {
+            int left_idx = i * 2;
+            int right_idx = i * 2 + 1;
+
+            int16_t prediction_left = predict_sample(buffer, left_idx, predictor_order, true);
+            int16_t residual_left = buffer[left_idx] - prediction_left;
+            prediction_errors.push_back(abs(residual_left));
+
+            int16_t prediction_right = predict_sample(buffer, right_idx, predictor_order, false);
+            int16_t residual_right = buffer[right_idx] - prediction_right;
+            prediction_errors.push_back(abs(residual_right));
+        }
+    }
+    else{
+        int16_t *buffercpy = new int16_t[frames * channels]; 
+        memcpy(buffercpy,buffer,frames*channels*sizeof(int16_t));
+        for (int i = 0; i < predictor_order; i++) {
+            int16_t left_sample = quantize_sample(buffer[i * 2],num_bits);
+            int16_t right_sample = quantize_sample(buffer[i * 2 + 1],num_bits);
+            prediction_errors.push_back(left_sample);     // Left channel
+            prediction_errors.push_back(right_sample); // Right channel
+            buffercpy[i*2] = dequantize_sample(left_sample,num_bits);
+            buffercpy[i*2+1] = dequantize_sample(right_sample,num_bits);
+        }
+
+        
+        // Encode residuals with prediction
+        for (int i = predictor_order; i < frames; i++) {
+            int left_idx = i * 2;
+            int right_idx = i * 2 + 1;
+
+            int16_t prediction_left = predict_sample(buffercpy, left_idx, predictor_order, true);
+            int16_t residual_left = buffercpy[left_idx] - prediction_left;
+            residual_left = quantize_sample(residual_left,num_bits);
+            prediction_errors.push_back(abs(residual_left));
+            buffercpy[left_idx] = prediction_left+dequantize_sample( residual_left,num_bits);      // alter the buffercpy position so we dont have the error propagation
+            
+            int16_t prediction_right = predict_sample(buffercpy, right_idx, predictor_order, false);
+            int16_t residual_right = buffercpy[right_idx] - prediction_right;
+            residual_right = quantize_sample(residual_right,num_bits);
+            buffercpy[right_idx] = prediction_right+dequantize_sample(residual_right,num_bits);      // alter the buffercpy position so we dont have the error propagation
+            prediction_errors.push_back(abs(residual_right));
+
+        }
+    }
+
+    double mean_error = 0;
+    for (int16_t error : prediction_errors) {
+        // cout << error << endl;
+        mean_error += error;
+    }
+    mean_error /= prediction_errors.size();
+
+    int dynamic_m = (int)pow(2, ceil(log2(mean_error)));
+    dynamic_m = max(dynamic_m, 2); // Ensure M is at least 2
+    return dynamic_m;
+}
+
 // Encode audio
 void encode_audio(const int16_t* buffer, int frames, int M, const string& output_file, int predictor_order) {
     Golomb encoder(M, false, output_file);
@@ -188,22 +254,6 @@ vector<int16_t> interchannel_decode(int M, const string& input_file, int frames)
     return decoded;
 }
 
-
-int16_t quantize_sample(int16_t sample, int num_bits) {
-
-    int16_t diff = 16-num_bits;
-    int16_t quantized_sample = sample >> diff ;
-
-    return quantized_sample;
-}
-
-int16_t dequantize_sample(int16_t sample, int num_bits) {
-
-    int16_t diff = 16-num_bits;
-    int16_t dequantized_sample = sample << diff;
-
-    return dequantized_sample;
-}
 
 // Encode audio
 void encode_audio_lossy(int16_t* buffer, int frames, int M, const string& output_file, int predictor_order, int num_bits) {
@@ -332,28 +382,34 @@ int main(int argc, char* argv[]) {
     printf("Would you like to give an M? [y/N] ");
     input = cin.get();
     int M;
+    bool dynamicM = false;
     if(input=="y"){
         cout << endl;
-        cout << "Type a number (preferebly higher than 100000): ";
+        cout << "Type a number: ";
 
         cin >> M;
-        M = (int)pow(2, ceil(log2(M)));
+        M = (int)pow(2, ceil(log2(M)));     // round the number to the nearest power of 2
     }
     else{
-        M = calculate_dynamic_m(buffer, frames);
+        dynamicM = true;
+        // M = calculate_dynamic_m(buffer, frames);
     }
-    // Calculate or read M
-    cout << "Using M: " << M << endl;
+    
 
     cout << "Would you like to try:"<<endl;
     cout << "1. Lossless encoding" << endl;
     cout << "2. Lossy encoding" << endl;
     cin >> input;
+    bool isLossless;
     if(input == "1"){
         cout << "Doing lossless encoding..." << endl;
     // Encoding and decoding
         int predictor_order = 3; 
 
+        isLossless = true;
+        if(dynamicM) M = calculate_dynamic_m(buffer, frames,channels, isLossless,predictor_order,0);
+        // Calculate or read M
+        cout << "Using M: " << M << endl;
         auto start = high_resolution_clock::now();
         encode_audio(buffer, frames, M, "error.bin", predictor_order);
         auto end = high_resolution_clock::now();
@@ -385,6 +441,11 @@ int main(int argc, char* argv[]) {
         cout << "What is your desired bitrate? ";
         cin >> num_bits;
         int predictor_order = 3; 
+
+        isLossless = false;
+        if(dynamicM) M = calculate_dynamic_m(buffer, frames, channels, isLossless,predictor_order,num_bits);
+        // Calculate or read M
+        cout << "Using M: " << M << endl;
 
         auto start = high_resolution_clock::now();
         encode_audio_lossy(buffer, frames, M, "error_lossy.bin", predictor_order,num_bits);
