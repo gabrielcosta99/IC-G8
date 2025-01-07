@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 #include <vector>
 #include <fstream>
@@ -462,11 +463,10 @@ private:
     }
 
 public:
-    InterFrameVideoCodec(int m, int width, int height,
-                    int iFrameInterval, int blockSize, int searchRange)
+    InterFrameVideoCodec(int m, int width, int height, int iFrameInterval, int blockSize, int searchRange)
         : imageCodec(m), width(width), height(height), frameCount(0),
-          iFrameInterval(iFrameInterval), blockSize(blockSize), 
-          searchRange(searchRange) {
+        iFrameInterval(iFrameInterval), blockSize(blockSize), 
+        searchRange(searchRange) {
         validateDimensions();
     }
 

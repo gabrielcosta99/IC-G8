@@ -61,12 +61,12 @@ void handleImageCompression(const string &imagePath, const string &outputPath, i
 }
 
 void handleIntraFrameVideoCompression(const string &videoPath, const string &outputPath, 
-                                    int width, int height, int frameCount, int m) {
+                                    int width, int height, int m) {
     try {
         cout << "Starting video compression..." << endl;
-        cout << "Parameters: " << width << "x" << height << ", " << frameCount << " frames" << endl;
+        cout << "Parameters: " << width << "x" << height << endl;
         
-        IntraFrameVideoCodec codec(m, width, height, frameCount);
+        IntraFrameVideoCodec codec(m, width, height);
         
         // Encode the video
         cout << "Encoding video..." << endl;
@@ -75,7 +75,7 @@ void handleIntraFrameVideoCompression(const string &videoPath, const string &out
         
         // Decode the video to verify
         cout << "Decoding video for verification..." << endl;
-        string decodedPath = outputPath + "_decoded.yuv";
+        string decodedPath = outputPath + "_decoded.y4m";
         codec.decode(outputPath, decodedPath);
         cout << "Decoding complete. Output saved to: " << decodedPath << endl;
         
@@ -84,12 +84,13 @@ void handleIntraFrameVideoCompression(const string &videoPath, const string &out
     }
 }
 
-void handleInterFrameVideoCompression (const string &videoPath, const string &outputPath, int m, int width, int height, int frameCount, int iFrameInterval, int blockSize, int searchRange, string format) {
+void handleInterFrameVideoCompression (const string &videoPath, const string &outputPath, int m, int width, int height, int iFrameInterval, int blockSize, int searchRange, string format) {
     try {
         cout << "Starting video compression..." << endl;
         cout << "Parameters: " << iFrameInterval << " I-frame interval, " << blockSize << " block size, " << searchRange << " search range" << endl;
         
-        InterFrameVideoCodec codec(m, width, height, frameCount, iFrameInterval, blockSize, searchRange);
+        // Fix constructor call by adding missing searchRange parameter
+        InterFrameVideoCodec codec(m, width, height, iFrameInterval, blockSize, searchRange);
         
         // Encode the video
         cout << "Encoding video..." << endl;
@@ -98,7 +99,7 @@ void handleInterFrameVideoCompression (const string &videoPath, const string &ou
         
         // Decode the video to verify
         cout << "Decoding video for verification..." << endl;
-        string decodedPath = outputPath + "_decoded.yuv";
+        string decodedPath = outputPath + "_decoded.y4m";
         codec.decode(outputPath, decodedPath);
         cout << "Decoding complete. Output saved to: " << decodedPath << endl;
         
@@ -107,13 +108,14 @@ void handleInterFrameVideoCompression (const string &videoPath, const string &ou
     }
 }
 
-void handleInterLossyFrameVideoCompression(const string &videoPath, const string &outputPath, int m, int width, int height, int frameCount, int iFrameInterval, int blockSize, int searchRange, int quantizationLevel) {
+void handleInterLossyFrameVideoCompression(const string &videoPath, const string &outputPath, int m, int width, int height, int iFrameInterval, int blockSize, int searchRange, int quantizationLevel) {
     try {
         cout << "Starting video compression..." << endl;
         cout << "Parameters: " << iFrameInterval << " I-frame interval, " << blockSize << " block size, " << searchRange << " search range" << endl;
         
-        InterFrameVideoLossyCodec codec(m, width, height, frameCount, iFrameInterval, blockSize, searchRange, quantizationLevel);
-        
+        // Fix constructor call order to match the class definition
+        InterFrameVideoLossyCodec codec(m, width, height, iFrameInterval, blockSize, searchRange, quantizationLevel);
+
         // Encode the video
         cout << "Encoding video..." << endl;
         codec.encode(videoPath, outputPath);
@@ -121,7 +123,7 @@ void handleInterLossyFrameVideoCompression(const string &videoPath, const string
         
         // Decode the video to verify
         cout << "Decoding video for verification..." << endl;
-        string decodedPath = outputPath + "_decoded.yuv";
+        string decodedPath = outputPath + "_decoded.y4m";
         codec.decode(outputPath, decodedPath);
         cout << "Decoding complete. Output saved to: " << decodedPath << endl;
         
@@ -161,12 +163,11 @@ void handleInterLossyFrameVideoCompression(const string &videoPath, const string
 
 void displayMenu() {
     cout << "Select mode:" << endl;
-    cout << "1. Image Encoding/Decoding" << endl;
-    cout << "2. Image Compression" << endl;
-    cout << "3. Intra-frame Video Compression" << endl;
-    cout << "4. Inter-frame Video Compression" << endl;
-    cout << "5. Inter-frame Lossy Video Compression" << endl;
-    cout << "6. Exit" << endl;
+    cout << "1. Image Compression" << endl;
+    cout << "2. Intra-frame Video Compression" << endl;
+    cout << "3. Inter-frame Video Compression" << endl;
+    cout << "4. Inter-frame Lossy Video Compression" << endl;
+    cout << "5. Exit" << endl;
     cout << "Enter your choice: ";
 }
 
@@ -189,18 +190,14 @@ void handleChoice(int choice) {
     int m = 4; // Default Golomb parameter
 
     switch (choice) {
-        case 1:
-            inputPath = chooseFile("../images");
-            handleImage(inputPath, m);
-            break;
-        case 2: {
+        case 1: {
             inputPath = chooseFile("../images");
             fs::path inputFilePath(inputPath);
             string outputPath = (inputFilePath.parent_path() / ("compressed_" + inputFilePath.filename().string())).string();
             handleImageCompression(inputPath, outputPath, m);
             break;
         }
-        case 3: {
+        case 2: {
             inputPath = chooseFile("../videos");
             fs::path inputFilePath(inputPath);
             string outputPath = (inputFilePath.parent_path() / ("encoded_" + inputFilePath.stem().string())).string();
@@ -209,14 +206,13 @@ void handleChoice(int choice) {
             cin >> width;
             cout << "Enter height: ";
             cin >> height;
-            cout << "Enter frame count: ";
-            cin >> frameCount;
-            handleIntraFrameVideoCompression(inputPath, outputPath, width, height, frameCount, m);
+
+            handleIntraFrameVideoCompression(inputPath, outputPath, width, height, m);
             Compare compare;
-            compare.compareFiles(inputPath, outputPath + "_decoded.yuv");
+            compare.compareFiles(inputPath, outputPath + "_decoded.y4m");
             break;
         }
-        case 4: {
+        case 3: {
             inputPath = chooseFile("../videos");
             fs::path inputFilePath(inputPath);
             string outputPath = (inputFilePath.parent_path() / ("encoded_inter_" + inputFilePath.stem().string())).string();
@@ -225,20 +221,18 @@ void handleChoice(int choice) {
             cin >> width;
             cout << "Enter height: ";
             cin >> height;
-            cout << "Enter frame count: ";
-            cin >> frameCount;
             cout << "Enter I-frame interval: ";
             cin >> iFrameInterval;
             cout << "Enter block size: ";
             cin >> blockSize;
             cout << "Enter search range: ";
             cin >> searchRange;
-            handleInterFrameVideoCompression(inputPath, outputPath, m, width, height, frameCount, iFrameInterval, blockSize, searchRange, "420");
+            handleInterFrameVideoCompression(inputPath, outputPath, m, width, height, iFrameInterval, blockSize, searchRange, "420");
             Compare compare;
-            compare.compareFiles(inputPath, outputPath + "_decoded.yuv");
+            compare.compareFiles(inputPath, outputPath + "_decoded.y4m");
             break;
         }
-        case 5: {
+        case 4: {
             inputPath = chooseFile("../videos");
             fs::path inputFilePath(inputPath);
             string outputPath = (inputFilePath.parent_path() / ("encoded_lossy_" + inputFilePath.stem().string())).string();
@@ -247,8 +241,6 @@ void handleChoice(int choice) {
             cin >> width;
             cout << "Enter height: ";
             cin >> height;
-            cout << "Enter frame count: ";
-            cin >> frameCount;
             cout << "Enter I-frame interval: ";
             cin >> iFrameInterval;
             cout << "Enter block size: ";
@@ -257,12 +249,12 @@ void handleChoice(int choice) {
             cin >> searchRange;
             cout << "Enter quantization level: ";
             cin >> quantizationLevel;
-            handleInterLossyFrameVideoCompression(inputPath, outputPath, m, width, height, frameCount, iFrameInterval, blockSize, searchRange, quantizationLevel);
+            handleInterLossyFrameVideoCompression(inputPath, outputPath, m, width, height, iFrameInterval, blockSize, searchRange, quantizationLevel);
             Compare compare;
-            compare.compareFiles(inputPath, outputPath + "_decoded.yuv");
+            compare.compareFiles(inputPath, outputPath + "_decoded.y4m");
             break;
         }
-        case 6:
+        case 5:
             cout << "Exiting program." << endl;
             exit(0);
         default:

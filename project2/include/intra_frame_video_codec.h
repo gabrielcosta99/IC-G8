@@ -58,14 +58,13 @@ private:
     bool parseY4MHeader(istream& file) {
         string header;
         getline(file, header);
-        
+
         if (header.substr(0, 10) != "YUV4MPEG2 ") {
             return false;
         }
 
-        // Parse format before modifying header
         sourceFormat = parseFormat(header);
-        
+
         // Modify header to always indicate 420 format
         size_t c_pos = header.find("C");
         if (c_pos != string::npos) {
@@ -77,20 +76,20 @@ private:
         }
 
         y4mHeader = header + "\n";
-        
+
         size_t w_pos = header.find("W");
         size_t h_pos = header.find("H");
-        
+
         if (w_pos == string::npos || h_pos == string::npos) {
             return false;
         }
 
         string w_str = header.substr(w_pos + 1, header.find(' ', w_pos) - w_pos - 1);
         string h_str = header.substr(h_pos + 1, header.find(' ', h_pos) - h_pos - 1);
-        
+
         width = stoi(w_str);
         height = stoi(h_str);
-        
+
         return true;
     }
 
@@ -179,9 +178,9 @@ private:
         string frameHeader;
         getline(file, frameHeader);
         
-        if (frameHeader != "FRAME") {
-            throw runtime_error("Invalid frame marker");
-        }
+        // if (frameHeader != "FRAME") {
+        //     throw runtime_error("Invalid frame marker");
+        // }
 
         vector<Mat> planes;
         
@@ -233,8 +232,8 @@ private:
     }
 
 public:
-    IntraFrameVideoCodec(int m, int width = 0, int height = 0, int frameCount = 0) 
-        : imageCodec(m), width(width), height(height), m(m) {
+    IntraFrameVideoCodec(int m, int width = 0, int height = 0) 
+        : imageCodec(m), width(width), height(height), m(m),frameCount(0) {
         if (width != 0 && height != 0) {
             validateDimensions();
         }

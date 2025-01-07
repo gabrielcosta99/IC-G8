@@ -477,12 +477,10 @@ private:
     }
 
 public:
-    InterFrameVideoLossyCodec(int m, int width, int height,
-                    int iFrameInterval, int blockSize, int searchRange,
-                    int quantizationLevel)
+    InterFrameVideoLossyCodec(int m, int width, int height, int iFrameInterval, int blockSize, int searchRange, int quantizationLevel)
         : imageCodec(m), width(width), height(height), frameCount(0),
-          iFrameInterval(iFrameInterval), blockSize(blockSize), 
-          searchRange(searchRange), quantizationLevel(quantizationLevel) {
+        iFrameInterval(iFrameInterval), blockSize(blockSize), 
+        searchRange(searchRange), quantizationLevel(quantizationLevel) {
         validateDimensions();
     }
 
