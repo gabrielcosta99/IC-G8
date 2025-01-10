@@ -104,11 +104,11 @@ For the sample "sample02.wav" we obtained the following results, where in lossy 
 \centering
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
-\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time}\\
+\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
 \hline
-Polynomial & 2.5 MB & 2.30 MB & 8.0\% & 132 + 211 ms\\
-Inter-Channel & 2.5 MB & 2.29 MB & 8.4\% & 111 + 180 ms\\
-Lossy & 2.5 MB & 1.01 MB & 59.6\% & 72 + 144 ms\\
+Polynomial & 2.5 MB & 2.30 MB & 8.0\% & 132 + 211 ms & inf\\
+Inter-Channel & 2.5 MB & 2.29 MB & 8.4\% & 111 + 180 ms & inf\\
+Lossy & 2.5 MB & 1.01 MB & 59.6\% & 72 + 144 ms & 24.9 dB\\
 \hline
 \end{tabular}
 \caption{Compression Performance Comparison}
@@ -120,11 +120,11 @@ For the sample "sample01.wav" (the biggest sample), we obtained the following re
 \centering
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
-\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time}\\
+\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
 \hline
-Polynomial & 5.2 MB & 4.27 MB & 17.9\% & 224 + 422 ms\\
-Inter-Channel & 5.2 MB & 4.41 MB & 15.2\% & 227 + 362 ms\\
-Lossy & 5.2 MB & 1.69 MB & 67.5\% & 137 + 270 ms\\
+Polynomial & 5.2 MB & 4.27 MB & 17.9\% & 224 + 422 ms & inf\\ 
+Inter-Channel & 5.2 MB & 4.41 MB & 15.2\% & 227 + 362 ms & inf\\
+Lossy & 5.2 MB & 1.69 MB & 67.5\% & 137 + 270 ms & 28.5 dB\\
 \hline
 \end{tabular}
 \caption{Compression Performance Comparison}
@@ -132,12 +132,14 @@ Lossy & 5.2 MB & 1.69 MB & 67.5\% & 137 + 270 ms\\
 
 
 
-As we can see, there is no noticeable compression difference between inter-channel coding and predictive coding in the lossless category. However, the lossy codec has a noticeable difference in compression size while also reducing the computation time. The problem rests in the noise generated, but since we only used 8 bitrate (half of the original), it is not noticeable.
+As we can see, there is no noticeable compression difference between inter-channel coding and predictive coding in the lossless category, and since we obtained infinite SNR for the lossless codecs, it means that it generated no noise (as it should). 
+
+On the other hand, the lossy codec has a noticeable difference in compression size while also reducing the computation time. The problem is based on the noise generated. The SNR value reveals that there is in fact some noise, but it is not too noticeable, even after using 8 bitrate (half of the original). 
 % As we can see, the lossy audio codec can achieve much higher compression rates without compromising too much the audio quality.
 
 % NAO SEI COMO COMPARAR COM O MP3
 \subsection{Comparative Analysis}
-Our lossy encoder achieves at best, a 68\% size reduction from the original WAV file without noticeable audio differences. In contrast, industry-standard codecs like MP3 typically achieve around a 75\% reduction while preserving good audio quality. This difference highlights the efficiency difference between our implementation and well-established, optimized codecs. 
+Our lossy encoder achieves at best, a 68\% size reduction from the original WAV file without too noticeable audio differences. In contrast, industry-standard codecs like MP3 typically achieve around a 75\% reduction while preserving good audio quality. This difference highlights the efficiency difference between our implementation and well-established, optimized codecs. 
 
 The primary factor driving this difference is the use of advanced techniques in industry-level codecs, such as psychoacoustic models. These models exploit human auditory perception to discard inaudible data, allowing for much higher compression ratios without perceptible quality loss. Integrating such sophisticated approaches is crucial for achieving competitive performance in audio compression.
 
