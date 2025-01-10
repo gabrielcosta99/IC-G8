@@ -262,21 +262,21 @@ We conducted extensive testing using standard test images, including the Lena im
 \hline
 \textbf{Predictor} & \textbf{Channel} & \textbf{Comp.Ratio} & \textbf{Time(ms)} & \textbf{Opt. m} \\
 \hline
-JPEG-LS & R & 0.72 & 23 & 6 \\
-JPEG-LS & G & 0.72 & 22 & 5 \\
-JPEG-LS & B & 0.59 & 21 & 4 \\
+JPEG-LS & R & 72\% & 23 & 6 \\
+JPEG-LS & G & 72\% & 22 & 5 \\
+JPEG-LS & B & 59\% & 21 & 4 \\
 \hline
-North & R & 0.72 & 17 & 6 \\
-North & G & 0.74 & 16 & 5 \\
-North & B & 0.60 & 16 & 4 \\
+North & R & 72\% & 17 & 6 \\
+North & G & 74\% & 16 & 5 \\
+North & B & 60\% & 16 & 4 \\
 \hline
-Northwest & R & 0.73 & 17 & 7 \\
-Northwest & G & 0.74 & 18 & 7 \\
-Northwest & B & 0.74 & 16 & 6 \\
+Northwest & R & 73\% & 17 & 7 \\
+Northwest & G & 74\% & 18 & 7 \\
+Northwest & B & 74\% & 16 & 6 \\
 \hline
-West & R & 0.72 & 25 & 7 \\
-West & G & 0.74 & 17 & 6 \\
-West & B & 0.73 & 16 & 5 \\
+West & R & 72\% & 25 & 7 \\
+West & G & 74\% & 17 & 6 \\
+West & B & 73\% & 16 & 5 \\
 \hline
 \end{tabular}
 \caption{Detailed Predictor Performance Analysis for Lena Image}
@@ -388,39 +388,54 @@ Potential enhancements include:
 \end{itemize}
 
 \section{Conclusion}
-The implemented video codec system demonstrates effective compression through:
+This project successfully implemented a comprehensive multimedia compression system, demonstrating effective techniques across three key domains:
+
+\subsection{Audio Compression}
+Our audio codec achieved significant results:
 \begin{itemize}
-    \item Efficient entropy coding using Golomb encoding
-    \item Effective motion estimation and compensation
-    \item Optimized storage mechanisms
-    \item Balance between compression ratio and quality
+    \item Lossless compression with predictive coding reached 15-18\% size reduction
+    \item Inter-channel coding showed similar efficiency (15-17\% reduction)
+    \item Lossy implementation achieved up to 68\% size reduction while maintaining good audio quality
+    \item Processing times remained efficient (under 500ms for 5MB files)
 \end{itemize}
 
-\appendix
-\section{Implementation Details}
-Key implementation highlights and code snippets:
+\subsection{Image Compression}
+The image codec demonstrated strong performance:
+\begin{itemize}
+    \item Perfect reconstruction in lossless mode with compression ratios of 0.59-0.74
+    \item JPEG-LS predictor showed superior performance, especially for blue channel (0.59 ratio)
+    \item Dynamic Golomb parameter optimization (m=4-7) improved efficiency
+    \item Fast processing times (16-25ms per channel)
+\end{itemize}
 
-\subsection{Golomb Encoding Example}
-\begin{lstlisting}[language=C++]
-void encode(int value) {
-    if (mode == 0) {
-        bs.writeBit(value < 0);
-        value = abs(value);
-    } else {
-        value = zigzagEncode(value);
-    }
-    // ... encoding implementation
-}
-\end{lstlisting}
+\subsection{Video Compression}
+Video compression implementation revealed:
+\begin{itemize}
+    \item Effective intra-frame coding using spatial redundancy
+    \item Inter-frame compression with motion estimation reduced file sizes
+    \item Block-based processing with configurable parameters
+    \item Successful integration of image codec techniques for frame compression
+\end{itemize}
 
-\subsection{Motion Estimation Example}
-\begin{lstlisting}[language=C++]
-Mat calculateResidual(const Mat &current, 
-                     const Mat &reference, 
-                     vector<Point2i> &motionVectors) {
-    // ... motion estimation implementation
-}
-\end{lstlisting}
+\subsection{Technical Achievements}
+Key innovations across all implementations include:
+\begin{itemize}
+    \item Efficient bit-level I/O operations
+    \item Adaptive parameter selection for optimal compression
+    \item Modular design allowing component reuse
+    \item Balance between compression efficiency and processing speed
+\end{itemize}
+
+\subsection{Future Directions}
+While the current implementation meets its core objectives, several opportunities for enhancement exist:
+\begin{itemize}
+    \item Implementation of B-frames for video compression
+    \item Parallel processing for improved performance
+    \item More sophisticated audio prediction models
+    \item Advanced rate control mechanisms
+\end{itemize}
+
+In conclusion, this project successfully demonstrated the implementation of fundamental compression techniques while maintaining modularity and efficiency. The results show competitive performance compared to standard formats, particularly in lossless compression scenarios, while providing insights into the tradeoffs between compression ratio, quality, and computational complexity.
 
 \end{document}
 
