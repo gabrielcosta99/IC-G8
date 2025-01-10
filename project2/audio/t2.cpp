@@ -394,13 +394,10 @@ void perform_lossy_encoding(int16_t *buffer, int frames, int M, int predictor_or
 }
 
 // Main Function
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        cout << "Usage: ./program <audio_file>" << endl;
-        return 1;
-    }
+int t2(const char* filename) {
+    
 
-    const char* filename = argv[1];
+    // const char* filename = argv[1];
     SF_INFO sfinfo = { 0 };
     SNDFILE* sf = sf_open(filename, SFM_READ, &sfinfo);
 
@@ -423,7 +420,7 @@ int main(int argc, char* argv[]) {
 
     string input;
     // ask if the user wants to give an M
-    printf("Would you like to give an M? [y/N] ");
+    printf("Would you like to give an M value? [y/N] ");
     input = cin.get();
     int M;
     bool dynamicM = false;
