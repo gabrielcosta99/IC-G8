@@ -376,6 +376,12 @@ void perform_lossless_encoding(int16_t *buffer, int frames, int M, int predictor
     cout << "Interchannel decoding took " << duration_cast<milliseconds>(end - start).count() << " ms" << endl;
 
     save_wav("reconstructed_inter.wav", inter_decoded, sample_rate, channels);
+    vector<int16_t> original_audio(buffer,buffer+frames*channels); 
+    double snr = calculate_snr(original_audio,decoded);
+    cout << "Predictive Signal-to-Noise Ratio (SNR): " << snr << " dB" << endl;
+    
+    snr = calculate_snr(original_audio,inter_decoded);
+    cout << "Interchannel Signal-to-Noise Ratio (SNR): " << snr << " dB" << endl;
 
 }
 
@@ -396,9 +402,9 @@ void perform_lossy_encoding(int16_t *buffer, int frames, int M, int predictor_or
 
     save_wav("reconstructed_lossy.wav", decoded, sample_rate, channels);
 
-    // vector<int16_t> original_audio(buffer,buffer+frames*channels); 
-    // double snr = calculate_snr(original_audio,decoded);
-    // cout << "Signal-to-Noise Ratio (SNR): " << snr << " dB" << endl;
+    vector<int16_t> original_audio(buffer,buffer+frames*channels); 
+    double snr = calculate_snr(original_audio,decoded);
+    cout << "Signal-to-Noise Ratio (SNR): " << snr << " dB" << endl;
 
     free(buffercpy);
 }
