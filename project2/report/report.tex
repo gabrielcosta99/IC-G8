@@ -12,9 +12,14 @@
 % \usepackage[format=plain,justification=center]{caption}
 \usepackage[utf8]{inputenc} % For special characters
 \geometry{a4paper, margin=1in}
-
+\usepackage{pgfplots}
+\usepackage{tikz}
+\pgfplotsset{compat=1.18}
 
 % Fancy header/footer settings
+\pagestyle{fancy}
+\fancyfoot[R]{\thepage} % Right-align page number in the footer
+
 \pagestyle{fancy}
 \fancyfoot[R]{\thepage} % Right-align page number in the footer
 
@@ -71,12 +76,163 @@ Implements efficient entropy coding:
     \item Zigzag encoding for efficient signed number representation
 \end{itemize}
 
-\subsubsection{Image Codec}
-Features predictive coding techniques:
+\section{Image Codec}
+The image codec implements multiple prediction modes to achieve optimal compression:
+
 \begin{itemize}
-    \item A-type predictor for spatial redundancy reduction
-    \item Multi-channel support for color images
-    \item Residual calculation and reconstruction
+    \item \textbf{Spatial Predictors}:
+    \begin{itemize}
+        \item \textbf{Predictor A (West)}: Uses the pixel to the left, optimal for horizontal gradients
+        \item \textbf{Predictor B (North)}: Uses the pixel above, best for vertical patterns
+        \item \textbf{Predictor C (Northwest)}: Uses the diagonal pixel, effective for diagonal textures
+        \item \textbf{JPEG-LS}: Adaptive predictor that combines A, B, and C based on local gradients:
+        \begin{equation}
+            P(x,y) = \begin{cases}
+                min(A,B) & \text{if } C \geq max(A,B) \\
+                max(A,B) & \text{if } C \leq min(A,B) \\
+                A + B - C & \text{otherwise}
+            \end{cases}
+        \end{equation}
+    \end{itemize}
+
+  
+\end{itemize}
+
+
+
+where $a$, $b$, and $c$ are the West, North, and Northwest pixels respectively.
+
+\subsection{Golomb Parameter Optimization}
+The optimal Golomb parameter $m$ is estimated using the mean absolute value of residuals:
+
+\textbf{Golomb Parameter Optimization}:
+    \begin{itemize}
+        \item Dynamic m calculation based on residual statistics
+        \item Uses mean absolute value ($\mu$) of residuals:
+        \begin{equation}
+            m = \left\lceil -\frac{1}{\log_2(\frac{\mu}{\mu+1})} \right\rceil
+        \end{equation}
+        \item Adapts to local image characteristics
+        \item Optimized separately for each color channel
+    \end{itemize}
+
+
+where $\mu$ is the mean absolute residual value. This approach minimizes the expected code length based on the geometric distribution of residuals.
+
+\subsection{Results}
+We conducted extensive testing using standard test images, including the Lena image (786,447 bytes). The analysis revealed several key insights about our lossless compression implementation:
+
+\begin{figure}[!htb]
+    \centering
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{lena.png}
+        \caption{Original Lena Test Image}
+        \label{fig:lena_original}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \centering
+        \begin{tikzpicture}
+            \begin{axis}[
+                width=\textwidth,
+                xlabel={Golomb Parameter (m)},
+                ylabel={Compression Ratio},
+                grid=major,
+                title={Compression Performance},
+                ymin=0.5, ymax=0.8,
+                xmin=2, xmax=8,
+                xtick={2,3,4,5,6,7,8},
+                legend style={
+                    at={(0.5,-0.2)},  % Position below the plot
+                    anchor=north,      % Anchor at the top
+                    legend columns=3,  % Spread legend entries horizontally
+                    cells={anchor=west},
+                    draw=none         % No border around legend
+                }
+            ]
+            % Red channel performance
+            \addplot[red,mark=*] coordinates {
+                (4,0.72)
+                (5,0.72)
+                (6,0.72)
+                (7,0.73)
+            };
+            % Green channel performance
+            \addplot[green,mark=square] coordinates {
+                (4,0.74)
+                (5,0.74)
+                (6,0.74)
+                (7,0.74)
+            };
+            % Blue channel performance
+            \addplot[blue,mark=triangle] coordinates {
+                (4,0.59)
+                (5,0.60)
+                (6,0.73)
+                (7,0.74)
+            };
+            \legend{Red Channel, Green Channel, Blue Channel}
+            \end{axis}
+        \end{tikzpicture}
+        \caption{Channel-specific Compression Ratio vs. Golomb Parameter}
+        \label{fig:compression_ratio}
+    \end{minipage}
+\end{figure}
+
+\begin{table}[!htb]
+\centering
+\small
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Predictor} & \textbf{Channel} & \textbf{Comp.Ratio} & \textbf{Time(ms)} & \textbf{Opt. m} \\
+\hline
+JPEG-LS & R & 0.72 & 23 & 6 \\
+JPEG-LS & G & 0.72 & 22 & 5 \\
+JPEG-LS & B & 0.59 & 21 & 4 \\
+\hline
+North & R & 0.72 & 17 & 6 \\
+North & G & 0.74 & 16 & 5 \\
+North & B & 0.60 & 16 & 4 \\
+\hline
+Northwest & R & 0.73 & 17 & 7 \\
+Northwest & G & 0.74 & 18 & 7 \\
+Northwest & B & 0.74 & 16 & 6 \\
+\hline
+West & R & 0.72 & 25 & 7 \\
+West & G & 0.74 & 17 & 6 \\
+West & B & 0.73 & 16 & 5 \\
+\hline
+\end{tabular}
+\caption{Detailed Predictor Performance Analysis for Lena Image}
+\label{tab:detailed_predictor_comparison}
+\end{table}
+
+\paragraph{}
+Key observations from the experimental results:
+\begin{itemize}
+    \item \textbf{Overall Compression}: The initial implementation achieved a 1:1 compression ratio with 0\% bit error rate, indicating perfect lossless reconstruction
+    
+    \item \textbf{Channel-Specific Performance}:
+    \begin{itemize}
+        \item Best compression achieved by JPEG-LS on blue channel (0.59 ratio)
+        \item Green channel showed consistent compression (0.72-0.74) across all predictors
+        \item Red channel performance varied between 0.72-0.73
+    \end{itemize}
+    
+    \item \textbf{Processing Efficiency}:
+    \begin{itemize}
+        \item North predictor fastest overall (16-17ms)
+        \item JPEG-LS slightly slower (21-23ms) but better compression
+        \item West predictor slowest for red channel (25ms)
+    \end{itemize}
+    
+    \item \textbf{Optimal m Values}:
+    \begin{itemize}
+        \item Range: 4-7 across all predictors and channels
+        \item Blue channel consistently uses lower m values (4-6)
+        \item Northwest predictor requires higher m values (6-7)
+    \end{itemize}
 \end{itemize}
 
 \section{Video Compression Techniques}
@@ -192,4 +348,6 @@ Mat calculateResidual(const Mat &current,
 \end{lstlisting}
 
 \end{document}
+
+
 

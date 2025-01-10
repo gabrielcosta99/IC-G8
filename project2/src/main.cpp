@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <filesystem>
+#include <iomanip>
 
 using namespace cv;
 using namespace std;
@@ -132,6 +133,36 @@ void handleInterLossyFrameVideoCompression(const string &videoPath, const string
     }
 }
 
+void analyzeImagePredictors(const string& imagePath) {
+    Mat image = imread(imagePath, IMREAD_COLOR);
+    if(image.empty()) {
+        cerr << "Failed to load image: " << imagePath << endl;
+        return;
+    }
+
+    ImageCodec codec(4); // Start with default m=4
+    auto results = codec.analyzePredictors(image);
+    
+    // Print results in a formatted table
+    cout << "\nPredictor Performance Analysis for " << imagePath << "\n";
+    cout << string(80, '-') << endl;
+    cout << setw(20) << "Predictor" << setw(15) << "Channel" << setw(12) << "PSNR" 
+         << setw(12) << "Comp.Ratio" << setw(12) << "Time(ms)" << setw(12) << "Opt. m" << endl;
+    cout << string(80, '-') << endl;
+    
+    for(const auto& result : results) {
+        string predictor = result.first.substr(0, result.first.find('_'));
+        string channel = result.first.substr(result.first.find('_') + 1);
+        const auto& metrics = result.second;
+        
+        cout << setw(20) << predictor << setw(15) << channel 
+             << setw(12) << fixed << setprecision(2) << metrics.psnr
+             << setw(12) << metrics.compressionRatio
+             << setw(12) << metrics.encodingTime
+             << setw(12) << metrics.optimalM << endl;
+    }
+    cout << string(80, '-') << endl;
+}
 
 //void handleIntraFrameVideoCompression(const string &videoPath, const string &outputPath, int m) {
 //    IntraFrameVideoCodec codec(m, "encoded_video");
@@ -195,6 +226,12 @@ void handleChoice(int choice) {
             fs::path inputFilePath(inputPath);
             string outputPath = (inputFilePath.parent_path() / ("compressed_" + inputFilePath.filename().string())).string();
             handleImageCompression(inputPath, outputPath, m);
+            cout << "Perform predictor analysis? (y/n): ";
+            char analyze;
+            cin >> analyze;
+            if(analyze == 'y' || analyze == 'Y') {
+                analyzeImagePredictors(inputPath);
+            }
             break;
         }
         case 2: {

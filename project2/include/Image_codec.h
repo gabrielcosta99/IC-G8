@@ -9,6 +9,7 @@
 #include "Golomb.h" // Include the Golomb class for encoding/decoding
 #include <opencv2/opencv.hpp>
 #include <filesystem> // For filesystem operations
+#include <chrono> // For measuring encoding time
 
 using namespace cv;
 using namespace std;
@@ -19,6 +20,14 @@ private:
     int m;      // Golomb parameter
     int mode;   // Prediction mode (0: A, 1: Average, etc.)
     int channelsCount; // Number of channels in the image
+
+    struct PredictorMetrics {
+        double psnr;
+        double compressionRatio;
+        double encodingTime;
+        double meanResidual;
+        int optimalM;
+    };
 
     /*
     * Calculate the A predictor for a single channel
@@ -75,6 +84,115 @@ private:
         
         // Estimate optimal m based on mean (Rice parameter selection)
         return max(1, static_cast<int>(ceil(-1/log2(mean/(mean+1)))));
+    }
+
+    // New helper method to calculate PSNR
+    double calculatePSNR(const Mat& original, const Mat& reconstructed) {
+        // For lossless compression, first check if images are identical
+        Mat diff;
+        absdiff(original, reconstructed, diff);
+        double maxDiff = norm(diff, NORM_INF);
+        
+        if (maxDiff < 1e-6) {
+            return std::numeric_limits<double>::infinity();
+        }
+        
+        // If there are differences (shouldn't happen in lossless), calculate PSNR
+        diff.convertTo(diff, CV_64F);
+        diff = diff.mul(diff);
+        double mse = mean(diff)[0];
+        return 10.0 * log10((255 * 255) / mse);
+    }
+
+    // Method to evaluate a single predictor
+    PredictorMetrics evaluatePredictor(const Mat& channel, int predictorType) {
+        PredictorMetrics metrics;
+        auto start = chrono::high_resolution_clock::now();
+        
+        // Calculate residuals using specified predictor
+        Mat residuals = Mat::zeros(channel.size(), CV_32S);
+        Mat reconstructed = Mat::zeros(channel.size(), CV_8UC1);
+
+        // First pass: calculate residuals and reconstruct simultaneously
+        for (int y = 0; y < channel.rows; ++y) {
+            for (int x = 0; x < channel.cols; ++x) {
+                int predicted;
+                // Use reconstructed values for prediction
+                switch(predictorType) {
+                    case 0: // West
+                        predicted = (x > 0) ? reconstructed.at<uchar>(y, x-1) : 0;
+                        break;
+                    case 1: // North
+                        predicted = (y > 0) ? reconstructed.at<uchar>(y-1, x) : 0;
+                        break;
+                    case 2: // Northwest
+                        predicted = (x > 0 && y > 0) ? reconstructed.at<uchar>(y-1, x-1) : 0;
+                        break;
+                    case 3: // JPEG-LS
+                        if (x == 0 || y == 0) {
+                            predicted = (x > 0) ? reconstructed.at<uchar>(y, x-1) : 
+                                      (y > 0) ? reconstructed.at<uchar>(y-1, x) : 0;
+                        } else {
+                            int a = reconstructed.at<uchar>(y, x-1);     // West
+                            int b = reconstructed.at<uchar>(y-1, x);     // North
+                            int c = reconstructed.at<uchar>(y-1, x-1);   // Northwest
+                            if (c >= max(a, b))
+                                predicted = min(a, b);
+                            else if (c <= min(a, b))
+                                predicted = max(a, b);
+                            else
+                                predicted = a + b - c;
+                        }
+                        break;
+                    default:
+                        predicted = 128;
+                }
+                
+                int current = channel.at<uchar>(y, x);
+                residuals.at<int>(y, x) = current - predicted;
+                reconstructed.at<uchar>(y, x) = saturate_cast<uchar>(predicted + residuals.at<int>(y, x));
+            }
+        }
+        
+        // Calculate metrics
+        metrics.meanResidual = 0;
+        for(int y = 0; y < residuals.rows; y++) {
+            for(int x = 0; x < residuals.cols; x++) {
+                metrics.meanResidual += abs(residuals.at<int>(y, x));
+            }
+        }
+        metrics.meanResidual /= (residuals.rows * residuals.cols);
+        metrics.optimalM = estimateOptimalM(residuals);
+        
+        // Verify perfect reconstruction
+        Mat diff;
+        absdiff(channel, reconstructed, diff);
+        double maxDiff = norm(diff, NORM_INF);
+        metrics.psnr = (maxDiff == 0) ? std::numeric_limits<double>::infinity() : 
+                      20 * log10(255.0 / maxDiff);
+        
+        // Calculate compression ratio
+        double originalBits = channel.rows * channel.cols * 8;
+        double compressedBits = 0;
+        
+        // Estimate bits without using Golomb class directly
+        for(int y = 0; y < residuals.rows; y++) {
+            for(int x = 0; x < residuals.cols; x++) {
+                int value = abs(residuals.at<int>(y, x));
+                // Estimate bits for quotient and remainder
+                int q = value / metrics.optimalM;
+                compressedBits += q + 1; // unary code for quotient
+                compressedBits += ceil(log2(metrics.optimalM)); // bits for remainder
+                compressedBits += 1; // sign bit
+            }
+        }
+        metrics.compressionRatio = compressedBits / originalBits;
+        
+        // Calculate encoding time
+        auto end = chrono::high_resolution_clock::now();
+        metrics.encodingTime = chrono::duration_cast<chrono::milliseconds>(end - start).count();
+        
+        return metrics;
     }
 
 public:
@@ -267,6 +385,24 @@ public:
         Mat reconstructedImage;
         merge(reconstructedChannels, reconstructedImage);
         imwrite(outputPath, reconstructedImage);
+    }
+
+    // New method to analyze all predictors
+    map<string, PredictorMetrics> analyzePredictors(const Mat& image) {
+        map<string, PredictorMetrics> results;
+        vector<Mat> channels;
+        split(image, channels);
+        
+        vector<string> predictorNames = {"West", "North", "Northwest", "JPEG-LS"};
+        
+        for(int i = 0; i < channels.size(); i++) {
+            for(int p = 0; p < 4; p++) {
+                string key = predictorNames[p] + "_channel" + to_string(i);
+                results[key] = evaluatePredictor(channels[i], p);
+            }
+        }
+        
+        return results;
     }
 
 };
