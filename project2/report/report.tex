@@ -54,6 +54,7 @@ The system consists of four main components:
 \begin{itemize}
     \item \textbf{BitStream}: Handles bit-level I/O operations for binary file manipulation
     \item \textbf{Golomb Codec}: Implements Golomb-Rice coding for entropy encoding
+    \item \textbf{Audio Codec}: Audio compression using predictive and inter-channel coding
     \item \textbf{Image Codec}: Manages image compression using predictive coding
     \item \textbf{Video Codecs}: Implements both intra-frame and inter-frame compression
 \end{itemize}
@@ -75,6 +76,80 @@ Implements efficient entropy coding:
     \item Support for both signed and unsigned integers
     \item Zigzag encoding for efficient signed number representation
 \end{itemize}
+
+\section{Audio Codec}
+In audio coding, our objective was to explore various audio compression methods aimed at reducing file size while preserving audio quality. To achieve this, we implemented two key approaches: a polynomial-based algorithm and an inter-channel residual calculation algorithm for lossless compression. For lossy compression, the polynomial algorithm was adapted by incorporating a quantization step.
+
+\subsection{Results}
+% \subsection{Performance Metrics}
+We tested two different samples with the algorithms:
+\begin{itemize}
+    \item \textbf{Predictive coding (order 3)}: Uses the last 3 samples of the same channel
+    \item \textbf{Inter-channel}: Uses the left channel to predict the samples of the right channel
+    \item \textbf{Predictive coding lossy}: Uses the first method, quantizing the residuals    
+\end{itemize}
+
+We evaluated the compression based on:
+    \begin{itemize}
+        \item The size of the compressed file generated
+        \item Execution/Computation time (encoder + decoder)
+        \item The "Signal-to-Noise Ratio"
+    \end{itemize}
+
+
+For the sample "sample02.wav" we obtained the following results, where in lossy coding, we had 8 bitrate:
+
+% FINISH THIS
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time}\\
+\hline
+Polynomial & 2.5 MB & 2.30 MB & 8.0\% & 132 + 211 ms\\
+Inter-Channel & 2.5 MB & 2.29 MB & 8.4\% & 111 + 180 ms\\
+Lossy & 2.5 MB & 1.01 MB & 59.6\% & 72 + 144 ms\\
+\hline
+\end{tabular}
+\caption{Compression Performance Comparison}
+\end{table}
+
+For the sample "sample01.wav" (the biggest sample), we obtained the following results, where in lossy coding, we had 8 bitrate:
+% FINISH THIS
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time}\\
+\hline
+Polynomial & 5.2 MB & 4.27 MB & 17.9\% & 224 + 422 ms\\
+Inter-Channel & 5.2 MB & 4.41 MB & 15.2\% & 227 + 362 ms\\
+Lossy & 5.2 MB & 1.69 MB & 67.5\% & 137 + 270 ms\\
+\hline
+\end{tabular}
+\caption{Compression Performance Comparison}
+\end{table}
+
+
+
+As we can see, there is no noticeable compression difference between inter-channel coding and predictive coding in the lossless category. However, the lossy codec has a noticeable difference in compression size while also reducing the computation time. The problem rests in the noise generated, but since we only used 8 bitrate (half of the original), it is not noticeable.
+% As we can see, the lossy audio codec can achieve much higher compression rates without compromising too much the audio quality.
+
+% NAO SEI COMO COMPARAR COM O MP3
+\subsection{Comparative Analysis}
+Our lossy encoder achieves at best, a 68\% size reduction from the original WAV file without noticeable audio differences. In contrast, industry-standard codecs like MP3 typically achieve around a 75\% reduction while preserving good audio quality. This difference highlights the efficiency difference between our implementation and well-established, optimized codecs. 
+
+The primary factor driving this difference is the use of advanced techniques in industry-level codecs, such as psychoacoustic models. These models exploit human auditory perception to discard inaudible data, allowing for much higher compression ratios without perceptible quality loss. Integrating such sophisticated approaches is crucial for achieving competitive performance in audio compression.
+
+
+
+\subsection{Limitations and Improvements}
+Our prediction model currently supports fixed-order linear predictors but lacks adaptive or non-linear capabilities, limiting its effectiveness in modeling complex audio signals. Additionally, the predictor assumes consistent channel separation and strictly linear patterns, which are not guaranteed for all audio inputs.
+
+Golomb coding, while efficient for certain residuals, performs poorly with high-entropy data. Alternative methods like Huffman or arithmetic coding could yield better compression results.
+
+Moreover, the encoded file is vulnerable to error propagation, where a single error can distort the entire signal, significantly degrading sound quality.
+
 
 \section{Image Codec}
 The image codec implements multiple prediction modes to achieve optimal compression:

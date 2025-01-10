@@ -144,6 +144,7 @@ int calculate_dynamic_m(int16_t* buffer, int frames,int channels, bool isLossles
             prediction_errors.push_back(abs(residual_right));
 
         }
+        free(buffercpy);
     }
 
     double mean_error = 0;
@@ -380,8 +381,11 @@ void perform_lossless_encoding(int16_t *buffer, int frames, int M, int predictor
 
 // Helper for lossy encoding
 void perform_lossy_encoding(int16_t *buffer, int frames, int M, int predictor_order, int num_bits, int sample_rate, int channels) {
+    int16_t *buffercpy = new int16_t[frames * channels]; 
+    memcpy(buffercpy,buffer,frames*channels*sizeof(int16_t));
+
     auto start = high_resolution_clock::now();
-    encode_audio_lossy(buffer, frames, M, "error_lossy.bin", predictor_order, num_bits);
+    encode_audio_lossy(buffercpy, frames, M, "error_lossy.bin", predictor_order, num_bits);
     auto end = high_resolution_clock::now();
     cout << "Lossy encoding completed in " << duration_cast<milliseconds>(end - start).count() << " ms\n";
 
@@ -391,6 +395,12 @@ void perform_lossy_encoding(int16_t *buffer, int frames, int M, int predictor_or
     cout << "Lossy decoding completed in " << duration_cast<milliseconds>(end - start).count() << " ms\n";
 
     save_wav("reconstructed_lossy.wav", decoded, sample_rate, channels);
+
+    // vector<int16_t> original_audio(buffer,buffer+frames*channels); 
+    // double snr = calculate_snr(original_audio,decoded);
+    // cout << "Signal-to-Noise Ratio (SNR): " << snr << " dB" << endl;
+
+    free(buffercpy);
 }
 
 // Main Function
