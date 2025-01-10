@@ -1,0 +1,18 @@
+Compilation and Running Instructions
+----------------------------------
+
+## for hhe audio processing
+# In the project root directory:
+cd audio
+make main
+./main [input_file]
+
+
+
+## for the image and video processing (make sure you have OpenCV installed)
+# In the project root directory:
+mkdir -p build
+cd build
+cmake ..
+make
+./main
