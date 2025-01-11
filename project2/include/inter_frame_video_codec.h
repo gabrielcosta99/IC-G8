@@ -248,40 +248,25 @@ protected:
         return SAD;
     }
 
-    // Improved motion estimation with early exit and spiral search
+    // Modified to improve motion estimation accuracy
     Point2i estimateMotion(const Mat& currentBlock, const Mat& referenceFrame, 
                           const Point& blockPos) const {
-        // ...existing code...
-        
-        // Use hierarchical search with multiple scales
-        vector<int> searchSteps = {8, 4, 2, 1};
         Point2i bestMV(0, 0);
-        int minSAD = INT_MAX;
-
-        for(int step : searchSteps) {
-            int rangeStart = -searchRange/step;
-            int rangeEnd = searchRange/step;
-            
-            for(int dy = rangeStart; dy <= rangeEnd; dy += 1) {
-                for(int dx = rangeStart; dx <= rangeEnd; dx += 1) {
-                    Point2i mv(bestMV.x + dx*step, bestMV.y + dy*step);
-                    
-                    // Check boundaries
-                    if(!isValidMotionVector(mv, blockPos, referenceFrame)) continue;
-                    
-                    int sad = calculateSAD(currentBlock, referenceFrame, blockPos, mv);
-                    
-                    if(sad < minSAD) {
-                        minSAD = sad;
-                        bestMV = mv;
-                    }
-                    
-                    // Early termination
-                    if(minSAD < EARLY_EXIT_THRESHOLD) return bestMV;
+        int minSAD = calculateSAD(currentBlock, referenceFrame, blockPos, bestMV);
+        
+        // Full search within search range
+        for(int dy = -searchRange; dy <= searchRange; dy++) {
+            for(int dx = -searchRange; dx <= searchRange; dx++) {
+                Point2i mv(dx, dy);
+                if(!isValidMotionVector(mv, blockPos, referenceFrame)) continue;
+                
+                int sad = calculateSAD(currentBlock, referenceFrame, blockPos, mv);
+                if(sad < minSAD) {
+                    minSAD = sad;
+                    bestMV = mv;
                 }
             }
         }
-        
         return bestMV;
     }
 
@@ -435,74 +420,31 @@ protected:
         }
     }
 
-    virtual void writeResidualsGolomb(const Mat& residuals, Golomb& golomb) const {
+    // Modified to ensure lossless reconstruction
+    void writeResidualsGolomb(const Mat& residuals, Golomb& golomb) const {
         // Write dimensions first
         golomb.encode(residuals.rows);
         golomb.encode(residuals.cols);
         
-        vector<int> values;
-        int zeroCount = 0;
-        
-        // Collect all non-zero values and their runs
+        // Write all values directly to ensure lossless compression
         for(int y = 0; y < residuals.rows; y++) {
             for(int x = 0; x < residuals.cols; x++) {
-                int val = residuals.at<int>(y, x);
-                if(val == 0) {
-                    zeroCount++;
-                } else {
-                    if(zeroCount > 0) {
-                        values.push_back(0);  // Zero marker
-                        values.push_back(zeroCount);
-                        zeroCount = 0;
-                    }
-                    values.push_back(val);
-                }
+                golomb.encode(residuals.at<int>(y, x));
             }
-        }
-        
-        // Handle trailing zeros
-        if(zeroCount > 0) {
-            values.push_back(0);
-            values.push_back(zeroCount);
-        }
-        
-        // Write the values
-        golomb.encode(values.size());
-        for(int val : values) {
-            golomb.encode(val);
         }
     }
 
-    virtual void readResidualsGolomb(Mat& residuals, Golomb& golomb) const {
-        // Read dimensions
+    // Modified to ensure lossless reconstruction
+    void readResidualsGolomb(Mat& residuals, Golomb& golomb) const {
         int rows = golomb.decode_val();
         int cols = golomb.decode_val();
         residuals = Mat::zeros(rows, cols, CV_32SC1);
         
-        size_t numValues = golomb.decode_val();
-        int pos = 0;
-        
-        for(size_t i = 0; i < numValues && pos < rows * cols;) {
-            int val = golomb.decode_val();
-            if(val == 0) {
-                // Read zero run length
-                int zeroCount = golomb.decode_val();
-                for(int j = 0; j < zeroCount && pos < rows * cols; j++) {
-                    residuals.at<int>(pos / cols, pos % cols) = 0;
-                    pos++;
-                }
-                i += 2; // Skip the zero marker and count
-            } else {
-                residuals.at<int>(pos / cols, pos % cols) = val;
-                pos++;
-                i++;
+        // Read all values directly
+        for(int y = 0; y < rows; y++) {
+            for(int x = 0; x < cols; x++) {
+                residuals.at<int>(y, x) = golomb.decode_val();
             }
-        }
-        
-        // Fill remaining positions with zeros if any
-        while(pos < rows * cols) {
-            residuals.at<int>(pos / cols, pos % cols) = 0;
-            pos++;
         }
     }
 
@@ -542,49 +484,52 @@ protected:
         return motionVectors;
     }
 
+    // Modified to ensure precise block reconstruction
     Mat decodePFrame(const Mat& referenceFrame, const vector<Point2i>& motionVectors,
-                const vector<bool>& blockModes, const Mat& residuals, int currentBlockSize) const {
+                     const vector<bool>& blockModes, const Mat& residuals, 
+                     int currentBlockSize) const {
         Mat reconstructed = Mat::zeros(referenceFrame.size(), referenceFrame.type());
         int blockIdx = 0;
         
-        for (int y = 0; y < reconstructed.rows; y += currentBlockSize) {
-            for (int x = 0; x < reconstructed.cols; x += currentBlockSize) {
-                int bw = min(currentBlockSize, reconstructed.cols - x);
-                int bh = min(currentBlockSize, reconstructed.rows - y);
-                Rect blockRect(x, y, bw, bh);
-                Mat blockResiduals = residuals(blockRect);
-                
-                if (blockModes[blockIdx]) {
+        for(int y = 0; y < reconstructed.rows; y += currentBlockSize) {
+            for(int x = 0; x < reconstructed.cols; x += currentBlockSize) {
+                Rect blockRect(x, y, 
+                             min(currentBlockSize, reconstructed.cols - x),
+                             min(currentBlockSize, reconstructed.rows - y));
+                             
+                if(blockModes[blockIdx]) {
                     // Intra mode
                     Mat prediction = predictBlock(reconstructed, blockRect);
-                    Mat reconstructedBlock(blockRect.size(), reconstructed.type());
+                    Mat block = prediction.clone();
                     
-                    for(int i = 0; i < blockResiduals.rows; i++) {
-                        for(int j = 0; j < blockResiduals.cols; j++) {
-                            reconstructedBlock.at<uchar>(i,j) = saturate_cast<uchar>(
-                                prediction.at<uchar>(i,j) + 
-                                blockResiduals.at<int>(i,j)
-                            );
+                    for(int by = 0; by < blockRect.height; by++) {
+                        for(int bx = 0; bx < blockRect.width; bx++) {
+                            int value = prediction.at<uchar>(by, bx) + 
+                                      residuals.at<int>(y + by, x + bx);
+                            block.at<uchar>(by, bx) = saturate_cast<uchar>(value);
                         }
                     }
-                    reconstructedBlock.copyTo(reconstructed(blockRect));
+                    block.copyTo(reconstructed(blockRect));
                 } else {
                     // Inter mode
                     Point2i mv = motionVectors[blockIdx];
-                    Rect predRect(x + mv.x, y + mv.y, bw, bh);
-                    predRect = predRect & Rect(0, 0, referenceFrame.cols, referenceFrame.rows);
-                    Mat predBlock = referenceFrame(predRect);
+                    Rect predRect(x + mv.x, y + mv.y, blockRect.width, blockRect.height);
                     
-                    Mat reconstructedBlock(blockRect.size(), reconstructed.type());
-                    for(int i = 0; i < blockResiduals.rows; i++) {
-                        for(int j = 0; j < blockResiduals.cols; j++) {
-                            reconstructedBlock.at<uchar>(i,j) = saturate_cast<uchar>(
-                                predBlock.at<uchar>(i,j) + 
-                                blockResiduals.at<int>(i,j)
-                            );
+                    if(predRect.x >= 0 && predRect.y >= 0 && 
+                       predRect.x + predRect.width <= referenceFrame.cols &&
+                       predRect.y + predRect.height <= referenceFrame.rows) {
+                        Mat prediction = referenceFrame(predRect);
+                        Mat block = prediction.clone();
+                        
+                        for(int by = 0; by < blockRect.height; by++) {
+                            for(int bx = 0; bx < blockRect.width; bx++) {
+                                int value = prediction.at<uchar>(by, bx) + 
+                                          residuals.at<int>(y + by, x + bx);
+                                block.at<uchar>(by, bx) = saturate_cast<uchar>(value);
+                            }
                         }
+                        block.copyTo(reconstructed(blockRect));
                     }
-                    reconstructedBlock.copyTo(reconstructed(blockRect));
                 }
                 blockIdx++;
             }
