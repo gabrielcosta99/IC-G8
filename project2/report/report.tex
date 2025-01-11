@@ -407,62 +407,6 @@ The \texttt{InterFrameVideoLossyCodec} enhances the base codec with advanced los
 \item \textbf{Basic Motion Estimation}: Lacks sub-pixel precision and multi-reference frames.
 \end{itemize}
 
-\section{Performance Analysis}
-
-\subsection{Compression Efficiency}
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|c|c|c|c|}
-\hline
-\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Ratio} & \textbf{PSNR} \\
-\hline
-Intra-Frame & X MB & Y MB & Z:1 & W dB \\
-Inter-Frame & X MB & Y MB & Z:1 & W dB \\
-\hline
-\end{tabular}
-\caption{Compression Performance Comparison}
-\end{table}
-
-\subsection{Processing Time}
-\begin{itemize}
-    \item \textbf{Encoding Time}: Analysis of encoding speed per frame
-    \item \textbf{Decoding Time}: Performance metrics for video playback
-    \item \textbf{Motion Estimation}: Impact of block size and search range
-\end{itemize}
-
-\subsection{Quality Assessment}
-Evaluation metrics include:
-\begin{itemize}
-    \item PSNR (Peak Signal-to-Noise Ratio)
-    \item MSE (Mean Squared Error)
-    \item Visual quality comparison
-\end{itemize}
-
-\section{Technical Innovations}
-
-\subsection{Storage Optimization}
-\begin{itemize}
-    \item Single-file approach for all frame data
-    \item Efficient metadata management
-    \item Optimized binary format for frame storage
-\end{itemize}
-
-\subsection{Motion Estimation}
-\begin{itemize}
-    \item Block-based search algorithm
-    \item Adaptive motion vector encoding
-    \item Efficient residual calculation
-\end{itemize}
-
-\section{Future Improvements}
-Potential enhancements include:
-\begin{itemize}
-    \item Advanced prediction modes
-    \item Parallel processing support
-    \item Adaptive Golomb parameter selection
-    \item B-frame implementation
-    \item Rate control mechanisms
-\end{itemize}
 
 \section{Conclusion}
 This project successfully implemented a comprehensive multimedia compression system, demonstrating effective techniques across three key domains:
