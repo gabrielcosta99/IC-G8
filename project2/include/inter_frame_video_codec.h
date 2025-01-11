@@ -13,10 +13,12 @@ struct BlockData {
     bool useIntraMode;
     Point2i motionVector;
     Mat residuals;
+    bool skipMode;       // Used for near-zero residual blocks
+    int predictionMode;  // Multiple intra prediction modes
 };
 
 class InterFrameVideoCodec {
-private:
+protected:
     ImageCodec imageCodec;
     int width;
     int height;
@@ -26,6 +28,15 @@ private:
     int searchRange;       
     string y4mHeader;
     int sourceFormat;
+
+    // Add new member variables for improved motion estimation
+    const int EARLY_EXIT_THRESHOLD = 256;
+
+    // New constants for improved compression
+    const int SKIP_THRESHOLD = 3;      // Maximum absolute sum for skip mode
+    const int SEARCH_STEP = 2;         // Step size for fast motion search
+    const int MAX_ZERO_RUN = 1024;     // Maximum zero run length
+    const float LAMBDA = 0.9;          // Rate-distortion trade-off factor
 
     // Helper functions from previous implementation
     size_t getYSize() const { return width * height; }
@@ -75,8 +86,6 @@ private:
             size_t space_pos = header.find(' ', c_pos);
             header = header.substr(0, c_pos) + "C420" + 
                     (space_pos != string::npos ? header.substr(space_pos) : "");
-        } else {
-            header += " C420";
         }
 
         y4mHeader = header + "\n";
@@ -201,12 +210,12 @@ private:
     Mat reconstructChannelWithPrediction(const Mat& residuals) const {
         Mat result(residuals.size(), CV_8UC1);
         
-        for (int y = 0; y < residuals.rows; ++y) {
+        for (int y = 0; y < residuals.rows; y++) {
             int predicted = 128;
             int pixel = predicted + residuals.at<int>(y, 0);
             result.at<uchar>(y, 0) = saturate_cast<uchar>(pixel);
             
-            for (int x = 1; x < residuals.cols; ++x) {
+            for (int x = 1; x < residuals.cols; x++) {
                 predicted = result.at<uchar>(y, x-1);
                 pixel = predicted + residuals.at<int>(y, x);
                 result.at<uchar>(y, x) = saturate_cast<uchar>(pixel);
@@ -215,39 +224,65 @@ private:
         return result;
     }
 
-    // Motion estimation for a single block
+    // Helper function to validate motion vector bounds
+    bool isValidMotionVector(const Point2i& mv, const Point& blockPos, const Mat& reference) const {
+        Point2i newPos(blockPos.x + mv.x, blockPos.y + mv.y);
+        return newPos.x >= 0 && 
+               newPos.y >= 0 && 
+               newPos.x + blockSize <= reference.cols &&
+               newPos.y + blockSize <= reference.rows;
+    }
+
+    // Helper function to calculate Sum of Absolute Differences
+    int calculateSAD(const Mat& currentBlock, const Mat& referenceFrame, 
+                    const Point& blockPos, const Point2i& mv) const {
+        Mat candidateBlock = referenceFrame(
+            Rect(blockPos.x + mv.x, blockPos.y + mv.y, blockSize, blockSize));
+        
+        int SAD = 0;
+        for(int y = 0; y < blockSize; y++) {
+            for(int x = 0; x < blockSize; x++) {
+                SAD += abs(currentBlock.at<uchar>(y, x) - candidateBlock.at<uchar>(y, x));
+            }
+        }
+        return SAD;
+    }
+
+    // Improved motion estimation with early exit and spiral search
     Point2i estimateMotion(const Mat& currentBlock, const Mat& referenceFrame, 
                           const Point& blockPos) const {
-        int bestX = 0, bestY = 0;
+        // ...existing code...
+        
+        // Use hierarchical search with multiple scales
+        vector<int> searchSteps = {8, 4, 2, 1};
+        Point2i bestMV(0, 0);
         int minSAD = INT_MAX;
-        
-        int startX = max(0, blockPos.x - searchRange);
-        int endX = min(referenceFrame.cols - blockSize, blockPos.x + searchRange);
-        int startY = max(0, blockPos.y - searchRange);
-        int endY = min(referenceFrame.rows - blockSize, blockPos.y + searchRange);
-        
-        for (int y = startY; y <= endY; ++y) {
-            for (int x = startX; x <= endX; ++x) {
-                Mat candidateBlock = referenceFrame(
-                    Rect(x, y, blockSize, blockSize));
-                
-                int SAD = 0;
-                for (int by = 0; by < blockSize; ++by) {
-                    for (int bx = 0; bx < blockSize; ++bx) {
-                        SAD += abs(currentBlock.at<uchar>(by, bx) - 
-                                 candidateBlock.at<uchar>(by, bx));
+
+        for(int step : searchSteps) {
+            int rangeStart = -searchRange/step;
+            int rangeEnd = searchRange/step;
+            
+            for(int dy = rangeStart; dy <= rangeEnd; dy += 1) {
+                for(int dx = rangeStart; dx <= rangeEnd; dx += 1) {
+                    Point2i mv(bestMV.x + dx*step, bestMV.y + dy*step);
+                    
+                    // Check boundaries
+                    if(!isValidMotionVector(mv, blockPos, referenceFrame)) continue;
+                    
+                    int sad = calculateSAD(currentBlock, referenceFrame, blockPos, mv);
+                    
+                    if(sad < minSAD) {
+                        minSAD = sad;
+                        bestMV = mv;
                     }
-                }
-                
-                if (SAD < minSAD) {
-                    minSAD = SAD;
-                    bestX = x - blockPos.x;
-                    bestY = y - blockPos.y;
+                    
+                    // Early termination
+                    if(minSAD < EARLY_EXIT_THRESHOLD) return bestMV;
                 }
             }
         }
         
-        return Point2i(bestX, bestY);
+        return bestMV;
     }
 
     int estimateBlockBits(const Mat& residuals, const Point2i& mv = Point2i(0,0)) const {
@@ -287,7 +322,7 @@ private:
         return predictions;
     }
 
-    // Determine best encoding mode for a block
+    // Improved block mode decision
     BlockData determineBlockMode(const Mat& currentFrame, const Mat& referenceFrame,
                                const Point& blockPos, int currentBlockSize) const {
         BlockData result;
@@ -296,21 +331,43 @@ private:
                       min(currentBlockSize, currentFrame.rows - blockPos.y));
         Mat currentBlock = currentFrame(blockRect);
         
+        // Check for skip mode first
+        if(isSkippableBlock(currentBlock, referenceFrame, blockPos)) {
+            result.skipMode = true;
+            result.useIntraMode = false;
+            result.motionVector = Point2i(0, 0);
+            result.residuals = Mat::zeros(blockRect.size(), CV_32SC1);
+            return result;
+        }
+
+        // Quick variance-based decision
+        Scalar mean, stddev;
+        meanStdDev(currentBlock, mean, stddev);
+        
+        // Use intra mode for low variance blocks
+        if(stddev[0] < 8.0) {
+            result.useIntraMode = true;
+            result.motionVector = Point2i(0, 0);
+            Mat intraPrediction = predictBlock(currentFrame, blockRect);
+            subtract(currentBlock, intraPrediction, result.residuals, noArray(), CV_32SC1);
+            return result;
+        }
+        
         // Try inter-frame coding
         Point2i mv = estimateMotion(currentBlock, referenceFrame, blockPos);
         Mat interPrediction = referenceFrame(
             Rect(blockPos.x + mv.x, blockPos.y + mv.y, blockRect.width, blockRect.height));
+        
+        // Compare inter and intra modes using bit estimation
         Mat interResiduals;
         subtract(currentBlock, interPrediction, interResiduals, noArray(), CV_32SC1);
         int interBits = estimateBlockBits(interResiduals, mv);
         
-        // Try intra-frame coding
         Mat intraPrediction = predictBlock(currentFrame, blockRect);
         Mat intraResiduals;
         subtract(currentBlock, intraPrediction, intraResiduals, noArray(), CV_32SC1);
         int intraBits = estimateBlockBits(intraResiduals);
         
-        // Choose the mode with lower bit cost
         if(intraBits < interBits) {
             result.useIntraMode = true;
             result.motionVector = Point2i(0, 0);
@@ -378,36 +435,109 @@ private:
         }
     }
 
-        void writeResidualsGolomb(const Mat& residuals, Golomb& golomb) const {
+    virtual void writeResidualsGolomb(const Mat& residuals, Golomb& golomb) const {
+        // Write dimensions first
+        golomb.encode(residuals.rows);
+        golomb.encode(residuals.cols);
+        
+        vector<int> values;
+        int zeroCount = 0;
+        
+        // Collect all non-zero values and their runs
         for(int y = 0; y < residuals.rows; y++) {
             for(int x = 0; x < residuals.cols; x++) {
-                golomb.encode(residuals.at<int>(y, x));
+                int val = residuals.at<int>(y, x);
+                if(val == 0) {
+                    zeroCount++;
+                } else {
+                    if(zeroCount > 0) {
+                        values.push_back(0);  // Zero marker
+                        values.push_back(zeroCount);
+                        zeroCount = 0;
+                    }
+                    values.push_back(val);
+                }
             }
         }
+        
+        // Handle trailing zeros
+        if(zeroCount > 0) {
+            values.push_back(0);
+            values.push_back(zeroCount);
+        }
+        
+        // Write the values
+        golomb.encode(values.size());
+        for(int val : values) {
+            golomb.encode(val);
+        }
     }
 
-    void readResidualsGolomb(Mat& residuals, Golomb& golomb) const {
-        for(int y = 0; y < residuals.rows; y++) {
-            for(int x = 0; x < residuals.cols; x++) {
-                residuals.at<int>(y, x) = golomb.decode_val();
+    virtual void readResidualsGolomb(Mat& residuals, Golomb& golomb) const {
+        // Read dimensions
+        int rows = golomb.decode_val();
+        int cols = golomb.decode_val();
+        residuals = Mat::zeros(rows, cols, CV_32SC1);
+        
+        size_t numValues = golomb.decode_val();
+        int pos = 0;
+        
+        for(size_t i = 0; i < numValues && pos < rows * cols;) {
+            int val = golomb.decode_val();
+            if(val == 0) {
+                // Read zero run length
+                int zeroCount = golomb.decode_val();
+                for(int j = 0; j < zeroCount && pos < rows * cols; j++) {
+                    residuals.at<int>(pos / cols, pos % cols) = 0;
+                    pos++;
+                }
+                i += 2; // Skip the zero marker and count
+            } else {
+                residuals.at<int>(pos / cols, pos % cols) = val;
+                pos++;
+                i++;
             }
         }
-    }
-
-    void writeMotionVectorsGolomb(const vector<Point2i>& motionVectors, Golomb& golomb) const {
-        for(const auto& mv : motionVectors) {
-            golomb.encode(mv.x);
-            golomb.encode(mv.y);
+        
+        // Fill remaining positions with zeros if any
+        while(pos < rows * cols) {
+            residuals.at<int>(pos / cols, pos % cols) = 0;
+            pos++;
         }
     }
 
-    vector<Point2i> readMotionVectorsGolomb(size_t count, Golomb& golomb) const {
+    // Add differential encoding for motion vectors
+    virtual void writeMotionVectorsGolomb(const vector<Point2i>& motionVectors, Golomb& golomb) const {
+        if (motionVectors.empty()) return;
+        
+        // Write first vector directly
+        golomb.encode(motionVectors[0].x);
+        golomb.encode(motionVectors[0].y);
+        
+        // Write differences for subsequent vectors
+        for(size_t i = 1; i < motionVectors.size(); i++) {
+            golomb.encode(motionVectors[i].x - motionVectors[i-1].x);
+            golomb.encode(motionVectors[i].y - motionVectors[i-1].y);
+        }
+    }
+
+    virtual vector<Point2i> readMotionVectorsGolomb(size_t count, Golomb& golomb) const {
         vector<Point2i> motionVectors;
-        motionVectors.reserve(count);
-        for(size_t i = 0; i < count; i++) {
-            int x = golomb.decode_val();
-            int y = golomb.decode_val();
-            motionVectors.push_back(Point2i(x, y));
+        if (count == 0) return motionVectors;
+        
+        // Read first vector
+        Point2i prev;
+        prev.x = golomb.decode_val();
+        prev.y = golomb.decode_val();
+        motionVectors.push_back(prev);
+        
+        // Read and reconstruct subsequent vectors
+        for(size_t i = 1; i < count; i++) {
+            Point2i current;
+            current.x = prev.x + golomb.decode_val();
+            current.y = prev.y + golomb.decode_val();
+            motionVectors.push_back(current);
+            prev = current;
         }
         return motionVectors;
     }
@@ -462,6 +592,18 @@ private:
         return reconstructed;
     }
 
+    // New helper methods for compression
+    bool isSkippableBlock(const Mat& block, const Mat& reference, const Point& pos) const {
+        int sum = 0;
+        for(int y = 0; y < block.rows; y++) {
+            for(int x = 0; x < block.cols; x++) {
+                sum += abs(block.at<uchar>(y,x) - reference.at<uchar>(pos.y+y, pos.x+x));
+                if(sum > SKIP_THRESHOLD) return false;
+            }
+        }
+        return true;
+    }
+
 public:
     InterFrameVideoCodec(int m, int width, int height, int iFrameInterval, int blockSize, int searchRange)
         : imageCodec(m), width(width), height(height), frameCount(0),
@@ -475,6 +617,11 @@ public:
         if (!input) {
             throw runtime_error("Could not open input file: " + inputPath);
         }
+
+        // Get input file size
+        input.seekg(0, ios::end);
+        size_t inputSize = input.tellg();
+        input.seekg(0, ios::beg);
 
         // Parse Y4M header
         if (!parseY4MHeader(input)) {
@@ -554,6 +701,14 @@ public:
         }
         
         golomb.end();
+        
+        // Get compressed size
+        ifstream binFile(outputPath + ".bin", ios::binary | ios::ate);
+        size_t compressedSize = binFile.tellg();
+        
+        cout << "Original size: " << inputSize << " bytes" << endl;
+        cout << "Compressed size: " << compressedSize << " bytes" << endl;
+        cout << "Compression ratio: " << (float)inputSize/compressedSize << ":1" << endl;
         cout << "Encoding complete" << endl;
     }
 
@@ -588,51 +743,60 @@ public:
         output << y4mHeader;
 
         vector<Mat> previousPlanes;
-        for (int f = 0; f < frameCount; ++f) {
-            bool isIFrame = golomb.decode_val() == 1;
-            vector<Mat> reconstructedPlanes;
-            
-            if (isIFrame) {
-                for (int i = 0; i < 3; ++i) {
-                    Mat residuals(i == 0 ? height : height/2,
-                                i == 0 ? width : width/2, CV_32SC1);
-                    readResidualsGolomb(residuals, golomb);
-                    reconstructedPlanes.push_back(
-                        reconstructChannelWithPrediction(residuals));
-                }
-            } else {
-                for (int i = 0; i < 3; ++i) {
-                    size_t numVectors = golomb.decode_val();
-                    vector<Point2i> motionVectors = 
-                        readMotionVectorsGolomb(numVectors, golomb);
-                    
-                    vector<bool> blockModes;
-                    for(size_t j = 0; j < numVectors; j++) {
-                        blockModes.push_back(golomb.decode_val() == 1);
+        // Initialize with empty planes
+        previousPlanes.push_back(Mat::zeros(height, width, CV_8UC1));
+        previousPlanes.push_back(Mat::zeros(height/2, width/2, CV_8UC1));
+        previousPlanes.push_back(Mat::zeros(height/2, width/2, CV_8UC1));
+
+        try {
+            for (int f = 0; f < frameCount; ++f) {
+                bool isIFrame = golomb.decode_val() == 1;
+                vector<Mat> reconstructedPlanes;
+
+                if (isIFrame) {
+                    for (int i = 0; i < 3; ++i) {
+                        Mat residuals;  // Let readResidualsGolomb allocate the proper size
+                        readResidualsGolomb(residuals, golomb);
+                        reconstructedPlanes.push_back(
+                            reconstructChannelWithPrediction(residuals));
                     }
-                    
-                    int channelWidth = (i == 0) ? width : width/2;
-                    int channelHeight = (i == 0) ? height : height/2;
-                    int channelBlockSize = (i == 0) ? blockSize : blockSize/2;
-                    
-                    Mat residuals(channelHeight, channelWidth, CV_32SC1);
-                    readResidualsGolomb(residuals, golomb);
-                    
-                    Mat reconstructedChannel = decodePFrame(previousPlanes[i], 
-                                                          motionVectors,
-                                                          blockModes, 
-                                                          residuals,
-                                                          channelBlockSize);
-                    reconstructedPlanes.push_back(reconstructedChannel);
+                } else {
+                    for (int i = 0; i < 3; ++i) {
+                        size_t numVectors = golomb.decode_val();
+                        vector<Point2i> motionVectors = 
+                            readMotionVectorsGolomb(numVectors, golomb);
+                        
+                        vector<bool> blockModes;
+                        for(size_t j = 0; j < numVectors; j++) {
+                            blockModes.push_back(golomb.decode_val() == 1);
+                        }
+                        
+                        int channelWidth = (i == 0) ? width : width/2;
+                        int channelHeight = (i == 0) ? height : height/2;
+                        int channelBlockSize = (i == 0) ? blockSize : blockSize/2;
+                        
+                        Mat residuals;  // Let readResidualsGolomb allocate the proper size
+                        readResidualsGolomb(residuals, golomb);
+                        
+                        Mat reconstructedChannel = decodePFrame(previousPlanes[i], 
+                                                              motionVectors,
+                                                              blockModes, 
+                                                              residuals,
+                                                              channelBlockSize);
+                        reconstructedPlanes.push_back(reconstructedChannel);
+                    }
+                }
+                
+                writeY4MFrame(reconstructedPlanes, output);
+                previousPlanes = reconstructedPlanes;
+                
+                if (f % 10 == 0) {
+                    cout << "Decoded frame " << f << "/" << frameCount << endl;
                 }
             }
-            
-            writeY4MFrame(reconstructedPlanes, output);
-            previousPlanes = reconstructedPlanes;
-            
-            if (f % 10 == 0) {
-                cout << "Decoded frame " << f << "/" << frameCount << endl;
-            }
+        } catch (const exception& e) {
+            cout << "Error during decoding: " << e.what() << endl;
+            throw;
         }
         
         cout << "Decoding complete" << endl;

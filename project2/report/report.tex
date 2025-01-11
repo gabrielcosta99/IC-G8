@@ -315,21 +315,96 @@ Key observations from the experimental results:
 \section{Video Compression Techniques}
 
 \subsection{Intra-Frame Coding}
-Implements frame-independent compression:
+The \texttt{IntraFrameVideoCodec} in C++ provides frame-independent compression with optimized spatial prediction and efficient entropy coding:
+
 \begin{itemize}
-    \item Channel separation for RGB frames
-    \item Predictive coding using spatial correlations
-    \item Single-file storage optimization for all frames
-    \item Metadata management for frame properties
+\item \textbf{Optimized Prediction Model}: Enhanced horizontal pixel prediction across Y, U, and V planes using OpenCV operations for reduced residuals.
+\item \textbf{Dynamic Format Handling}: Native support for YUV420p with real-time conversion from YUV422 and YUV444 formats.
+\item \textbf{Golomb Coding Efficiency}: Residuals encoded via Golomb coding, enhanced by a user-defined \texttt{m} parameter.
+\item \textbf{Y4M Format Parsing}: Robust parsing of Y4M headers for adaptive video dimension and format handling.
+\item \textbf{Progress Tracking}: Real-time encoding and decoding progress updates for user feedback.
+\end{itemize}
+
+\subsubsection{Comparative Analysis}
+\begin{itemize}
+\item \textbf{Versus JPEG/H.264}: Provides purely lossless compression, unlike JPEG or H.264, making it suitable for high-fidelity use cases.
+\item \textbf{Compression Efficiency}: Lower than H.264 due to the absence of inter-frame prediction and transform coding.
+\end{itemize}
+
+\subsubsection{Challenges}
+\begin{itemize}
+\item \textbf{Dimension Validation}: Strict enforcement of even dimensions for YUV420p compatibility.
+\item \textbf{Adaptive Format Parsing}: Handling diverse YUV formats.
 \end{itemize}
 
 \subsection{Inter-Frame Coding}
-Utilizes temporal redundancy:
+The \texttt{InterFrameVideoCodec} in C++ focuses on efficient video compression through predictive coding, supporting both intra-frame (I-frame) and inter-frame (P-frame) encoding.
+
 \begin{itemize}
-    \item Motion estimation using block matching
-    \item Configurable block size and search range
-    \item I-frame and P-frame management
-    \item Motion vector encoding and residual compression
+\item \textbf{Prediction Models}: Combines intra-frame spatial prediction with inter-frame motion compensation.
+\item \textbf{Adaptive Block Processing}: Block-based encoding with adjustable block sizes and search ranges.
+\item \textbf{Enhanced Motion Estimation}: Hierarchical search with early exit thresholds and spiral search.
+\item \textbf{Skip Mode}: Skips blocks with near-zero residuals to minimize data storage.
+\item \textbf{Adaptive Quantization}: Quantizes residuals to improve compression efficiency.
+\item \textbf{Differential Motion Vector Encoding}: Reduces redundancy by encoding motion vector differences.
+\end{itemize}
+
+\subsubsection{Temporal Prediction}
+\begin{itemize}
+\item \textbf{Hierarchical Motion Estimation}: Multi-scale search with varying step sizes for motion vector accuracy.
+\item \textbf{Motion Compensation}: Applies motion vectors to reduce temporal redundancy.
+\item \textbf{Residual Quantization}: Reduces precision of residuals for better compression.
+\item \textbf{Mode Decision}: Dynamically selects between intra and inter prediction using rate-distortion optimization.
+\end{itemize}
+
+\subsubsection{Comparative Analysis}
+\begin{itemize}
+\item \textbf{Versus H.264}: Simpler than H.264 but benefits from adaptive quantization and hierarchical motion estimation.
+\item \textbf{Golomb Coding Efficiency}: Enhanced with run-length and zero-run optimizations.
+\end{itemize}
+
+\subsubsection{Challenges}
+\begin{itemize}
+\item \textbf{Motion Estimation Complexity}: Balancing computational efficiency and motion accuracy.
+\item \textbf{Error Propagation}: Managing cumulative errors from quantization and prediction.
+\item \textbf{Memory Management}: Efficient buffering for large video files.
+\end{itemize}
+
+\subsubsection{Identified Limitations}
+\begin{itemize}
+\item \textbf{Basic Motion Estimation}: No sub-pixel precision or multiple reference frames.
+\end{itemize}
+
+\subsection{Lossy Inter-Frame Coding}
+The \texttt{InterFrameVideoLossyCodec} enhances the base codec with advanced lossy compression techniques:
+
+\begin{itemize}
+\item \textbf{Dead-Zone Quantization}: Suppresses insignificant data using quantization with configurable steps for higher compression.
+\item \textbf{Adaptive Quantization Control}: Dynamically adjusts quantization levels based on scene complexity.
+\item \textbf{Run-Length Encoding}: Efficiently encodes zero residual runs to reduce entropy coding overhead.
+\item \textbf{Golomb Coding Integration}: Integrates optimized Golomb coding with zero-run length encoding.
+\item \textbf{Chroma Subsampling Optimization}: Applies higher quantization to chroma components for perceptual quality retention.
+\end{itemize}
+
+\subsubsection{Comparative Analysis}
+\begin{itemize}
+\item \textbf{Versus H.264}: Simpler but achieves effective compression through adaptive quantization and motion estimation.
+\item \textbf{Golomb Coding Efficiency}: Enhanced with zero-run and run-length optimizations.
+\item \textbf{Lossy Compression Gains}: Achieves higher compression ratios with controlled quality loss.
+\end{itemize}
+
+\subsubsection{Challenges}
+\begin{itemize}
+\item \textbf{Motion Estimation Complexity}: Balancing computational cost with motion accuracy.
+\item \textbf{Error Propagation}: Controlling error accumulation due to quantization.
+\item \textbf{Quantization Trade-offs}: Managing the balance between compression efficiency and visual quality.
+\end{itemize}
+
+\subsubsection{Identified Limitations}
+\begin{itemize}
+\item \textbf{Fixed Quantization Levels}: Limited adaptability across diverse content types.
+\item \textbf{Lack of Transform Coding}: Absence of DCT or wavelet transforms reduces compression efficiency.
+\item \textbf{Basic Motion Estimation}: Lacks sub-pixel precision and multi-reference frames.
 \end{itemize}
 
 \section{Performance Analysis}

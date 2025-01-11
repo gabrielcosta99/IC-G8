@@ -71,8 +71,6 @@ private:
             size_t space_pos = header.find(' ', c_pos);
             header = header.substr(0, c_pos) + "C420" + 
                     (space_pos != string::npos ? header.substr(space_pos) : "");
-        } else {
-            header += " C420";
         }
 
         y4mHeader = header + "\n";
@@ -109,30 +107,32 @@ private:
         }
     }
 
-    // Spatial prediction for a single channel (unchanged)
+    // Add progress tracking
+    void updateProgress(int current, int total) const {
+        int percentage = (current * 100) / total;
+        cout << "\rProgress: " << percentage << "% (" << current << "/" << total << " frames)" << flush;
+    }
+
+    // Optimized spatial prediction using OpenCV operations
     Mat predictChannel(const Mat& channel) const {
         Mat predictions(channel.size(), CV_8UC1);
         
-        for (int y = 0; y < channel.rows; ++y) {
-            predictions.at<uchar>(y, 0) = 128;
-            for (int x = 1; x < channel.cols; ++x) {
-                predictions.at<uchar>(y, x) = channel.at<uchar>(y, x-1);
-            }
+        // Set first column to 128
+        predictions.col(0).setTo(128);
+        
+        // For each remaining column, copy the previous column
+        for (int x = 1; x < channel.cols; ++x) {
+            channel.col(x-1).copyTo(predictions.col(x));
         }
+        
         return predictions;
     }
 
-    // Calculate residuals with prediction (unchanged)
+    // Optimized residual calculation
     Mat calculateResidualsWithPrediction(const Mat& channel) const {
         Mat predictions = predictChannel(channel);
-        Mat residuals(channel.size(), CV_32SC1);
-        
-        for (int y = 0; y < channel.rows; ++y) {
-            for (int x = 0; x < channel.cols; ++x) {
-                residuals.at<int>(y, x) = static_cast<int>(channel.at<uchar>(y, x)) - 
-                                        static_cast<int>(predictions.at<uchar>(y, x));
-            }
-        }
+        Mat residuals;
+        subtract(channel, predictions, residuals, noArray(), CV_32SC1);
         return residuals;
     }
 
@@ -156,21 +156,22 @@ private:
         return residuals;
     }
 
-    // Reconstruct channel from residuals (unchanged)
+    // Optimized channel reconstruction
     Mat reconstructChannelWithPrediction(const Mat& residuals) const {
         Mat result(residuals.size(), CV_8UC1);
         
-        for (int y = 0; y < residuals.rows; ++y) {
-            int predicted = 128;
-            int pixel = predicted + residuals.at<int>(y, 0);
-            result.at<uchar>(y, 0) = saturate_cast<uchar>(pixel);
-            
-            for (int x = 1; x < residuals.cols; ++x) {
-                predicted = result.at<uchar>(y, x-1);
-                pixel = predicted + residuals.at<int>(y, x);
-                result.at<uchar>(y, x) = saturate_cast<uchar>(pixel);
-            }
+        // First column special case
+        Mat firstCol = residuals.col(0) + 128;
+        firstCol.convertTo(result.col(0), CV_8UC1);
+        
+        for (int x = 1; x < residuals.cols; ++x) {
+            Mat predictedCol = result.col(x-1);
+            Mat residualCol = residuals.col(x);
+            Mat resultCol;
+            add(predictedCol, residualCol, resultCol, noArray(), CV_8UC1);
+            resultCol.copyTo(result.col(x));
         }
+        
         return result;
     }
 
@@ -178,9 +179,9 @@ private:
         string frameHeader;
         getline(file, frameHeader);
         
-        // if (frameHeader != "FRAME") {
-        //     throw runtime_error("Invalid frame marker");
-        // }
+        if (frameHeader != "FRAME") {
+             throw runtime_error("Invalid frame marker");
+        }
 
         vector<Mat> planes;
         
@@ -233,7 +234,7 @@ private:
 
 public:
     IntraFrameVideoCodec(int m, int width = 0, int height = 0) 
-        : imageCodec(m), width(width), height(height), m(m),frameCount(0) {
+    : imageCodec(m), width(width), height(height), m(m),frameCount(0) {
         if (width != 0 && height != 0) {
             validateDimensions();
         }
@@ -275,22 +276,26 @@ public:
         cout << "Encoding " << frameCount << " frames..." << endl;
         
         for (int f = 0; f < frameCount; ++f) {
-            vector<Mat> planes = readY4MFrame(input);
-            
-            // Process and encode each plane
-            Mat yResiduals = calculateResidualsWithPrediction(planes[0]);
-            writeResiduals(yResiduals, golomb);
-            
-            Mat uResiduals = calculateResidualsWithPrediction(planes[1]);
-            writeResiduals(uResiduals, golomb);
-            
-            Mat vResiduals = calculateResidualsWithPrediction(planes[2]);
-            writeResiduals(vResiduals, golomb);
-            
-            if (f % 10 == 0) {
-                cout << "Encoded frame " << f << "/" << frameCount << endl;
+            try {
+                vector<Mat> planes = readY4MFrame(input);
+                
+                // Process and encode each plane
+                Mat yResiduals = calculateResidualsWithPrediction(planes[0]);
+                writeResiduals(yResiduals, golomb);
+                
+                Mat uResiduals = calculateResidualsWithPrediction(planes[1]);
+                writeResiduals(uResiduals, golomb);
+                
+                Mat vResiduals = calculateResidualsWithPrediction(planes[2]);
+                writeResiduals(vResiduals, golomb);
+                
+                updateProgress(f + 1, frameCount);
+            } catch (const exception& e) {
+                cerr << "\nError processing frame " << f << ": " << e.what() << endl;
+                throw;
             }
         }
+        cout << endl;
         
         golomb.end();
         cout << "Encoding complete" << endl;
@@ -329,27 +334,31 @@ public:
         cout << "Decoding " << frameCount << " frames..." << endl;
 
         for (int f = 0; f < frameCount; ++f) {
-            vector<Mat> reconstructedPlanes;
-            
-            // Read and reconstruct Y plane
-            Mat yResiduals = readResiduals(golomb, height, width);
-            reconstructedPlanes.push_back(reconstructChannelWithPrediction(yResiduals));
-            
-            // Read and reconstruct U plane
-            Mat uResiduals = readResiduals(golomb, height/2, width/2);
-            reconstructedPlanes.push_back(reconstructChannelWithPrediction(uResiduals));
-            
-            // Read and reconstruct V plane
-            Mat vResiduals = readResiduals(golomb, height/2, width/2);
-            reconstructedPlanes.push_back(reconstructChannelWithPrediction(vResiduals));
-            
-            // Write reconstructed Y4M frame
-            writeY4MFrame(reconstructedPlanes, output);
-            
-            if (f % 10 == 0) {
-                cout << "Decoded frame " << f << "/" << frameCount << endl;
+            try {
+                vector<Mat> reconstructedPlanes;
+                
+                // Read and reconstruct Y plane
+                Mat yResiduals = readResiduals(golomb, height, width);
+                reconstructedPlanes.push_back(reconstructChannelWithPrediction(yResiduals));
+                
+                // Read and reconstruct U plane
+                Mat uResiduals = readResiduals(golomb, height/2, width/2);
+                reconstructedPlanes.push_back(reconstructChannelWithPrediction(uResiduals));
+                
+                // Read and reconstruct V plane
+                Mat vResiduals = readResiduals(golomb, height/2, width/2);
+                reconstructedPlanes.push_back(reconstructChannelWithPrediction(vResiduals));
+                
+                // Write reconstructed Y4M frame
+                writeY4MFrame(reconstructedPlanes, output);
+                
+                updateProgress(f + 1, frameCount);
+            } catch (const exception& e) {
+                cerr << "\nError processing frame " << f << ": " << e.what() << endl;
+                throw;
             }
         }
+        cout << endl;
         
         cout << "Decoding complete" << endl;
     }

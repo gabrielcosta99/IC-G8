@@ -63,6 +63,39 @@ public:
         std::cout << "Bit error rate: " << errorRate << "%" << std::endl; // Display as percentage
         printf("\n");
     }
+
+    /**
+     * @brief Compare original and decoded files
+     * @param original path to the original file
+     * @param decoded path to the decoded file
+     */
+    void compareVideoFiles(const std::string& original, const std::string& decoded) {
+        std::ifstream orig(original, std::ios::binary);
+        std::ifstream dec(decoded, std::ios::binary);
+
+        if (!orig || !dec) {
+            std::cout << "Error opening files for comparison" << std::endl;
+            return;
+        }
+
+        // Skip Y4M headers
+        std::string header;
+        std::getline(orig, header);
+        std::getline(dec, header);
+
+        char buf1, buf2;
+        size_t totalBytes = 0;
+        size_t diffBytes = 0;
+
+        while (orig.get(buf1) && dec.get(buf2)) {
+            if (buf1 != buf2) diffBytes++;
+            totalBytes++;
+        }
+
+        std::cout << "Total bytes compared: " << totalBytes << std::endl;
+        std::cout << "Different bytes: " << diffBytes << std::endl;
+        std::cout << "Match percentage: " << 100.0 * (totalBytes - diffBytes) / totalBytes << "%" << std::endl;
+    }
 };
 
 #endif //COMPARE_H
