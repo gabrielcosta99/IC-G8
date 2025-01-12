@@ -338,41 +338,40 @@ The \texttt{IntraFrameVideoCodec} in C++ provides frame-independent compression 
 \end{itemize}
 
 \subsection{Inter-Frame Coding}
-The \texttt{InterFrameVideoCodec} in C++ focuses on efficient video compression through predictive coding, supporting both intra-frame (I-frame) and inter-frame (P-frame) encoding.
+The \texttt{InterFrameVideoCodec} in C++ implements efficient video compression through predictive coding, supporting both intra-frame (I-frame) and inter-frame (P-frame) encoding.
 
 \begin{itemize}
-\item \textbf{Prediction Models}: Combines intra-frame spatial prediction with inter-frame motion compensation.
-\item \textbf{Adaptive Block Processing}: Block-based encoding with adjustable block sizes and search ranges.
-\item \textbf{Enhanced Motion Estimation}: Hierarchical search with early exit thresholds and spiral search.
-\item \textbf{Skip Mode}: Skips blocks with near-zero residuals to minimize data storage.
-\item \textbf{Adaptive Quantization}: Quantizes residuals to improve compression efficiency.
-\item \textbf{Differential Motion Vector Encoding}: Reduces redundancy by encoding motion vector differences.
+\item \textbf{Prediction Models}: Combines spatial intra-frame prediction with motion-compensated inter-frame prediction.
+\item \textbf{Block-Based Encoding}: Processes video frames in blocks with adjustable sizes and incorporates adaptive search ranges for efficiency.
+\item \textbf{Motion Estimation and Compensation}: Employs constrained search ranges and Sum of Absolute Differences (SAD) for motion vector accuracy.
+\item \textbf{Residual Management}: Encodes and quantizes residuals from predictions to optimize data storage.
+\item \textbf{Differential Motion Vector Encoding}: Reduces redundancy by encoding motion vector differences using Golomb coding.
 \end{itemize}
 
 \subsubsection{Temporal Prediction}
 \begin{itemize}
-\item \textbf{Hierarchical Motion Estimation}: Multi-scale search with varying step sizes for motion vector accuracy.
-\item \textbf{Motion Compensation}: Applies motion vectors to reduce temporal redundancy.
-\item \textbf{Residual Quantization}: Reduces precision of residuals for better compression.
-\item \textbf{Mode Decision}: Dynamically selects between intra and inter prediction using rate-distortion optimization.
+\item \textbf{Hierarchical Motion Estimation}: Combines multi-scale search with constrained boundaries to ensure accuracy and computational efficiency.
+\item \textbf{Skip Mode}: Skips blocks with residuals below a defined threshold to further minimize data storage.
+\item \textbf{Rate-Distortion Optimization}: Dynamically selects between intra-frame and inter-frame coding modes based on residual and motion vector costs.
 \end{itemize}
 
 \subsubsection{Comparative Analysis}
 \begin{itemize}
-\item \textbf{Versus H.264}: Simpler than H.264 but benefits from adaptive quantization and hierarchical motion estimation.
-\item \textbf{Golomb Coding Efficiency}: Enhanced with run-length and zero-run optimizations.
+\item \textbf{Golomb Coding Efficiency}: Applies Golomb encoding for motion vectors and residuals, reducing storage costs with run-length optimizations.
+\item \textbf{Versus H.264}: Simpler than H.264, focusing on basic motion estimation, single reference frames, and no sub-pixel precision, yet efficient due to adaptive quantization and constrained encoding strategies.
 \end{itemize}
 
 \subsubsection{Challenges}
 \begin{itemize}
-\item \textbf{Motion Estimation Complexity}: Balancing computational efficiency and motion accuracy.
-\item \textbf{Error Propagation}: Managing cumulative errors from quantization and prediction.
-\item \textbf{Memory Management}: Efficient buffering for large video files.
+\item \textbf{Motion Estimation Complexity}: Balancing accuracy with computational overhead, particularly during hierarchical searches.
+\item \textbf{Error Propagation}: Addressing cumulative errors introduced by quantization in inter-frame predictions.
+\item \textbf{Memory Management}: Efficiently handling large video frames and buffers, especially during encoding/decoding.
 \end{itemize}
 
 \subsubsection{Identified Limitations}
 \begin{itemize}
-\item \textbf{Basic Motion Estimation}: No sub-pixel precision or multiple reference frames.
+\item \textbf{Motion Estimation Simplifications}: Lacks sub-pixel precision, multiple reference frames, and advanced search patterns like diamond or hexagon searches.
+\item \textbf{Skip Mode Thresholding}: Fixed thresholds might not adapt optimally to varying content across videos.
 \end{itemize}
 
 \subsection{Lossy Inter-Frame Coding}

@@ -225,63 +225,71 @@ protected:
     }
 
     // Helper function to validate motion vector bounds
-    bool isValidMotionVector(const Point2i& mv, const Point& blockPos, const Mat& reference) const {
+    bool isValidMotionVector(const Point2i& mv, const Point& blockPos, const Mat& reference, int currentBlockSize) const {
         Point2i newPos(blockPos.x + mv.x, blockPos.y + mv.y);
         return newPos.x >= 0 && 
                newPos.y >= 0 && 
-               newPos.x + blockSize <= reference.cols &&
-               newPos.y + blockSize <= reference.rows;
+               newPos.x + currentBlockSize <= reference.cols &&
+               newPos.y + currentBlockSize <= reference.rows;
     }
 
     // Helper function to calculate Sum of Absolute Differences
     int calculateSAD(const Mat& currentBlock, const Mat& referenceFrame, 
-                    const Point& blockPos, const Point2i& mv) const {
-        Mat candidateBlock = referenceFrame(
-            Rect(blockPos.x + mv.x, blockPos.y + mv.y, blockSize, blockSize));
+                    const Point& blockPos, const Point2i& mv, int currentBlockSize) const {
+        if (!isValidMotionVector(mv, blockPos, referenceFrame, currentBlockSize)) {
+            return INT_MAX;
+        }
+        
+        Rect candidateRect(blockPos.x + mv.x, blockPos.y + mv.y, 
+                          currentBlock.cols, currentBlock.rows);
+        Mat candidateBlock = referenceFrame(candidateRect);
         
         int SAD = 0;
-        for(int y = 0; y < blockSize; y++) {
-            for(int x = 0; x < blockSize; x++) {
+        for(int y = 0; y < currentBlock.rows; y++) {
+            for(int x = 0; x < currentBlock.cols; x++) {
                 SAD += abs(currentBlock.at<uchar>(y, x) - candidateBlock.at<uchar>(y, x));
             }
         }
         return SAD;
     }
 
-    // Improved motion estimation with early exit and spiral search
     Point2i estimateMotion(const Mat& currentBlock, const Mat& referenceFrame, 
-                          const Point& blockPos) const {
-        // ...existing code...
-        
-        // Use hierarchical search with multiple scales
-        vector<int> searchSteps = {8, 4, 2, 1};
+                          const Point& blockPos, int currentBlockSize) const {
+        // Simple zero motion vector if block or boundaries are invalid
+        if (blockPos.x < 0 || blockPos.y < 0 || 
+            blockPos.x + currentBlockSize > referenceFrame.cols ||
+            blockPos.y + currentBlockSize > referenceFrame.rows) {
+            return Point2i(0, 0);
+        }
+
         Point2i bestMV(0, 0);
         int minSAD = INT_MAX;
 
-        for(int step : searchSteps) {
-            int rangeStart = -searchRange/step;
-            int rangeEnd = searchRange/step;
-            
-            for(int dy = rangeStart; dy <= rangeEnd; dy += 1) {
-                for(int dx = rangeStart; dx <= rangeEnd; dx += 1) {
-                    Point2i mv(bestMV.x + dx*step, bestMV.y + dy*step);
-                    
-                    // Check boundaries
-                    if(!isValidMotionVector(mv, blockPos, referenceFrame)) continue;
-                    
-                    int sad = calculateSAD(currentBlock, referenceFrame, blockPos, mv);
-                    
-                    if(sad < minSAD) {
-                        minSAD = sad;
-                        bestMV = mv;
+        // Constrained search range to avoid boundary issues
+        int xStart = max(-searchRange, -blockPos.x);
+        int yStart = max(-searchRange, -blockPos.y);
+        int xEnd = min(searchRange, referenceFrame.cols - blockPos.x - currentBlockSize);
+        int yEnd = min(searchRange, referenceFrame.rows - blockPos.y - currentBlockSize);
+
+        for(int dy = yStart; dy <= yEnd; dy++) {
+            for(int dx = xStart; dx <= xEnd; dx++) {
+                Point2i mv(dx, dy);
+                Rect searchRect(blockPos.x + dx, blockPos.y + dy, currentBlockSize, currentBlockSize);
+                Mat candidateBlock = referenceFrame(searchRect);
+                
+                int sad = 0;
+                for(int y = 0; y < currentBlockSize; y++) {
+                    for(int x = 0; x < currentBlockSize; x++) {
+                        sad += abs(currentBlock.at<uchar>(y,x) - candidateBlock.at<uchar>(y,x));
                     }
-                    
-                    // Early termination
-                    if(minSAD < EARLY_EXIT_THRESHOLD) return bestMV;
+                }
+                
+                if(sad < minSAD) {
+                    minSAD = sad;
+                    bestMV = mv;
                 }
             }
         }
-        
         return bestMV;
     }
 
@@ -322,62 +330,48 @@ protected:
         return predictions;
     }
 
-    // Improved block mode decision
+    // Remove skip mode and early termination which were causing quality issues
     BlockData determineBlockMode(const Mat& currentFrame, const Mat& referenceFrame,
                                const Point& blockPos, int currentBlockSize) const {
         BlockData result;
         Rect blockRect(blockPos.x, blockPos.y, 
                       min(currentBlockSize, currentFrame.cols - blockPos.x),
                       min(currentBlockSize, currentFrame.rows - blockPos.y));
+        
+        // Ensure block is within frame boundaries
+        if (blockRect.x < 0 || blockRect.y < 0 || 
+            blockRect.x + blockRect.width > currentFrame.cols ||
+            blockRect.y + blockRect.height > currentFrame.rows) {
+            throw runtime_error("Invalid block boundaries");
+        }
+        
         Mat currentBlock = currentFrame(blockRect);
         
-        // Check for skip mode first
-        if(isSkippableBlock(currentBlock, referenceFrame, blockPos)) {
-            result.skipMode = true;
-            result.useIntraMode = false;
-            result.motionVector = Point2i(0, 0);
-            result.residuals = Mat::zeros(blockRect.size(), CV_32SC1);
-            return result;
-        }
-
-        // Quick variance-based decision
-        Scalar mean, stddev;
-        meanStdDev(currentBlock, mean, stddev);
-        
-        // Use intra mode for low variance blocks
-        if(stddev[0] < 8.0) {
-            result.useIntraMode = true;
-            result.motionVector = Point2i(0, 0);
-            Mat intraPrediction = predictBlock(currentFrame, blockRect);
-            subtract(currentBlock, intraPrediction, result.residuals, noArray(), CV_32SC1);
-            return result;
-        }
-        
         // Try inter-frame coding
-        Point2i mv = estimateMotion(currentBlock, referenceFrame, blockPos);
-        Mat interPrediction = referenceFrame(
-            Rect(blockPos.x + mv.x, blockPos.y + mv.y, blockRect.width, blockRect.height));
+        Point2i mv = estimateMotion(currentBlock, referenceFrame, blockPos, currentBlockSize);
         
-        // Compare inter and intra modes using bit estimation
-        Mat interResiduals;
-        subtract(currentBlock, interPrediction, interResiduals, noArray(), CV_32SC1);
-        int interBits = estimateBlockBits(interResiduals, mv);
-        
-        Mat intraPrediction = predictBlock(currentFrame, blockRect);
-        Mat intraResiduals;
-        subtract(currentBlock, intraPrediction, intraResiduals, noArray(), CV_32SC1);
-        int intraBits = estimateBlockBits(intraResiduals);
-        
-        if(intraBits < interBits) {
-            result.useIntraMode = true;
-            result.motionVector = Point2i(0, 0);
-            result.residuals = intraResiduals;
-        } else {
+        // Check if motion vector is valid
+        if (isValidMotionVector(mv, blockPos, referenceFrame, currentBlockSize)) {
+            Rect predRect(blockPos.x + mv.x, blockPos.y + mv.y, 
+                         blockRect.width, blockRect.height);
+            Mat interPrediction = referenceFrame(predRect);
+            Mat interResiduals;
+            subtract(currentBlock, interPrediction, interResiduals, noArray(), CV_32SC1);
+            
             result.useIntraMode = false;
             result.motionVector = mv;
             result.residuals = interResiduals;
+        } else {
+            // Fallback to intra mode if motion vector is invalid
+            result.useIntraMode = true;
+            result.motionVector = Point2i(0, 0);
+            Mat intraPrediction = predictBlock(currentFrame, blockRect);
+            Mat intraResiduals;
+            subtract(currentBlock, intraPrediction, intraResiduals, noArray(), CV_32SC1);
+            result.residuals = intraResiduals;
         }
         
+        result.skipMode = false;
         return result;
     }
 
@@ -435,74 +429,31 @@ protected:
         }
     }
 
+    // Fixed residual writing - remove run length encoding which was causing issues
     virtual void writeResidualsGolomb(const Mat& residuals, Golomb& golomb) const {
-        // Write dimensions first
+        // Write dimensions
         golomb.encode(residuals.rows);
         golomb.encode(residuals.cols);
         
-        vector<int> values;
-        int zeroCount = 0;
-        
-        // Collect all non-zero values and their runs
+        // Write all residual values directly
         for(int y = 0; y < residuals.rows; y++) {
             for(int x = 0; x < residuals.cols; x++) {
-                int val = residuals.at<int>(y, x);
-                if(val == 0) {
-                    zeroCount++;
-                } else {
-                    if(zeroCount > 0) {
-                        values.push_back(0);  // Zero marker
-                        values.push_back(zeroCount);
-                        zeroCount = 0;
-                    }
-                    values.push_back(val);
-                }
+                golomb.encode(residuals.at<int>(y, x));
             }
-        }
-        
-        // Handle trailing zeros
-        if(zeroCount > 0) {
-            values.push_back(0);
-            values.push_back(zeroCount);
-        }
-        
-        // Write the values
-        golomb.encode(values.size());
-        for(int val : values) {
-            golomb.encode(val);
         }
     }
 
+    // Fixed residual reading to match the writing
     virtual void readResidualsGolomb(Mat& residuals, Golomb& golomb) const {
-        // Read dimensions
         int rows = golomb.decode_val();
         int cols = golomb.decode_val();
         residuals = Mat::zeros(rows, cols, CV_32SC1);
         
-        size_t numValues = golomb.decode_val();
-        int pos = 0;
-        
-        for(size_t i = 0; i < numValues && pos < rows * cols;) {
-            int val = golomb.decode_val();
-            if(val == 0) {
-                // Read zero run length
-                int zeroCount = golomb.decode_val();
-                for(int j = 0; j < zeroCount && pos < rows * cols; j++) {
-                    residuals.at<int>(pos / cols, pos % cols) = 0;
-                    pos++;
-                }
-                i += 2; // Skip the zero marker and count
-            } else {
-                residuals.at<int>(pos / cols, pos % cols) = val;
-                pos++;
-                i++;
+        // Read all values directly
+        for(int y = 0; y < rows; y++) {
+            for(int x = 0; x < cols; x++) {
+                residuals.at<int>(y, x) = golomb.decode_val();
             }
-        }
-        
-        // Fill remaining positions with zeros if any
-        while(pos < rows * cols) {
-            residuals.at<int>(pos / cols, pos % cols) = 0;
-            pos++;
         }
     }
 
