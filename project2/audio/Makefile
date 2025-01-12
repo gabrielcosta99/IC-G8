@@ -8,7 +8,7 @@ t2: t2.cpp
 	g++ -Wall $< -o $@ -lsndfile
 
 
-main: main.cpp t2.cpp
+main: main.cpp t2.cpp t1.cpp main.h
 	g++ -Wall $< -o $@ -lsndfile
 
 clean:
