@@ -82,7 +82,7 @@ In audio coding, our objective was to explore various audio compression methods 
 
 We chose the polynomial codec because it is simpler to implement. Given time constraints, we were unable to study and implement more complex algorithms, so we opted for a straightforward yet effective approach.
 
-\section{Golomb Parameter Optimization}
+\subsection{Golomb Parameter Optimization}
 The optimal Golomb parameter $m$ is estimated using the mean absolute value of residuals.
 To do so we:
     \begin{itemize}
@@ -96,7 +96,7 @@ To do so we:
 
 \subsection{Results}
 % \subsection{Performance Metrics}
-We tested two different stereo samples with the algorithms:
+We tested two different stereo samples, obtained from the professor's datasets, with the algorithms:
 \begin{itemize}
     \item \textbf{Predictive coding (order 3)}: Uses the last 3 samples of the same channel
     \item \textbf{Inter-channel}: Uses the left channel to predict the samples of the right channel
@@ -111,41 +111,49 @@ We evaluated the compression based on:
     \end{itemize}
 
 
-For the sample "sample02.wav" we obtained the following results, where in lossy coding, we had 8 bitrate:
+For the sample "sample02.wav," we obtained the following results. In the case of lossy coding, each residual was quantized to 8 bits:
 
 % FINISH THIS
 \begin{table}[H]
 \centering
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
-\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
+\textbf{Predictor order} & \textbf{Method} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
 \hline
-Polynomial & 2.5 MB & 2.30 MB & 8.0\% & 132 + 211 ms & inf\\
-Inter-Channel & 2.5 MB & 2.29 MB & 8.4\% & 111 + 180 ms & inf\\
-Lossy & 2.5 MB & 1.01 MB & 59.6\% & 72 + 144 ms & 24.9 dB\\
+3 & Polynomial & 21.9\% & 132 + 211 ms & inf\\
+3 & Inter-Channel & 14.0\% & 111 + 180 ms & inf\\
+3 & Lossy & 71.5\% & 72 + 144 ms & 24.9 dB\\
+\hline
+1 & Polynomial & 23.4\% & 109 + 195 ms & inf\\ 
+1 &Inter-Channel & 14.9\% & 120 + 182 ms & inf\\
+1 & Lossy & 73.1\% & 56 + 125 ms & 24.9 dB\\
 \hline
 \end{tabular}
 \caption{Compression Performance Comparison of "sample02.wav"}
 \end{table}
 
-For the sample "sample01.wav" (the biggest sample), we obtained the following results, where in lossy coding, we had 8 bitrate:
+For the sample "sample01.wav," we obtained the following results. In the case of lossy coding, we also quantized each residual to 8 bits:
 % FINISH THIS
 \begin{table}[H]
 \centering
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
-\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
+\textbf{Predictor order} & \textbf{Method} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
 \hline
-Polynomial & 5.2 MB & 4.27 MB & 17.9\% & 224 + 422 ms & inf\\ 
-Inter-Channel & 5.2 MB & 4.41 MB & 15.2\% & 227 + 362 ms & inf\\
-Lossy & 5.2 MB & 1.69 MB & 67.5\% & 137 + 270 ms & 28.5 dB\\
+3 & Polynomial & 23.6\% & 224 + 422 ms & inf\\ 
+3 &Inter-Channel & 14.7\% & 227 + 362 ms & inf\\
+3 & Lossy & 73.0\% & 137 + 270 ms & 28.5 dB\\
+\hline
+1 & Polynomial & 23.6\% & 220 + 392 ms & inf\\
+1 & Inter-Channel & 14.7\% & 231 + 383 ms & inf\\
+1 & Lossy & 73.2\% & 114 + 256 ms & 28.5 dB\\
 \hline
 \end{tabular}
 \caption{Compression Performance Comparison of "sample01.wav"}
 \end{table}
 
 
-As we can see, there is no noticeable compression difference between inter-channel coding and predictive coding in the lossless category, and since we obtained infinite SNR for the lossless codecs, it means that it generated no noise (as it should). 
+As we can see, there is no noticeable compression difference between inter-channel coding and predictive coding in the lossless category, and since we obtained infinite SNR for the lossless codecs, it means that it generated no noise (as it should). There is also no noticeable difference between different predictor orders (number of previous samples to use to predict the next sample).
 
 On the other hand, the lossy codec has a noticeable difference in compression size while also reducing the computation time. The problem is based on the generated noise. The SNR value reveals that there is in fact some noise, but it is not too noticeable, even after using 8 bitrate (half of the original). \\
 % As we can see, the lossy audio codec can achieve much higher compression rates without compromising too much the audio quality.
@@ -157,10 +165,13 @@ Lastly, we tested a mono-sample ("balafon.wav") using the same parameters as bef
 \centering
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
-\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
+\textbf{Predictor Order}\textbf{Method} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
 \hline
-Polynomial & 3.04 MB & 1.75 MB & 42.4\% & 108 + 209 ms & inf\\ 
-Lossy & 3.04 MB & 0.63 MB & 79.3\% & 59 + 145 ms & 23.9 dB\\
+3 & Polynomial & 42.4\% & 108 + 209 ms & inf\\ 
+3 & Lossy & 79.3\% & 59 + 145 ms & 23.9 dB\\
+\hline
+1 & Polynomial & 35.4\% & 108 + 214 ms & inf\\ 
+1 & Lossy & 80.2\% & 53 + 139 ms & 23.9 dB\\
 \hline
 \end{tabular}
 \caption{Compression Performance Comparison of "balafon.wav"}

@@ -237,6 +237,11 @@ int main(int argc, char* argv[]){
 
     bool isLossless = (input == "1");
     int predictor_order = 3; // Default predictor order
+    cout << "Number of previous samples to use in the predictor (1 to 4): ";
+    cin >> predictor_order;
+    if(predictor_order > 4) predictor_order = 4;
+    else if(predictor_order < 1) predictor_order = 1;
+    cout << "predictor_order: " << predictor_order << endl;
     int target_bitrate;     
     int num_bits = 16;      // number of bits that each sample will have 
 
