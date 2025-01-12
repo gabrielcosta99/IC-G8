@@ -82,7 +82,7 @@ In audio coding, our objective was to explore various audio compression methods 
 
 \subsection{Results}
 % \subsection{Performance Metrics}
-We tested two different samples with the algorithms:
+We tested two different stereo samples with the algorithms:
 \begin{itemize}
     \item \textbf{Predictive coding (order 3)}: Uses the last 3 samples of the same channel
     \item \textbf{Inter-channel}: Uses the left channel to predict the samples of the right channel
@@ -111,7 +111,7 @@ Inter-Channel & 2.5 MB & 2.29 MB & 8.4\% & 111 + 180 ms & inf\\
 Lossy & 2.5 MB & 1.01 MB & 59.6\% & 72 + 144 ms & 24.9 dB\\
 \hline
 \end{tabular}
-\caption{Compression Performance Comparison}
+\caption{Compression Performance Comparison of "sample02.wav"}
 \end{table}
 
 For the sample "sample01.wav" (the biggest sample), we obtained the following results, where in lossy coding, we had 8 bitrate:
@@ -127,17 +127,34 @@ Inter-Channel & 5.2 MB & 4.41 MB & 15.2\% & 227 + 362 ms & inf\\
 Lossy & 5.2 MB & 1.69 MB & 67.5\% & 137 + 270 ms & 28.5 dB\\
 \hline
 \end{tabular}
-\caption{Compression Performance Comparison}
+\caption{Compression Performance Comparison of "sample01.wav"}
 \end{table}
-
 
 
 As we can see, there is no noticeable compression difference between inter-channel coding and predictive coding in the lossless category, and since we obtained infinite SNR for the lossless codecs, it means that it generated no noise (as it should). 
 
-On the other hand, the lossy codec has a noticeable difference in compression size while also reducing the computation time. The problem is based on the noise generated. The SNR value reveals that there is in fact some noise, but it is not too noticeable, even after using 8 bitrate (half of the original). 
+On the other hand, the lossy codec has a noticeable difference in compression size while also reducing the computation time. The problem is based on the generated noise. The SNR value reveals that there is in fact some noise, but it is not too noticeable, even after using 8 bitrate (half of the original). \\
 % As we can see, the lossy audio codec can achieve much higher compression rates without compromising too much the audio quality.
 
-% NAO SEI COMO COMPARAR COM O MP3
+
+
+Lastly, we tested a mono-sample ("balafon.wav") using the same parameters as before.
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Method} & \textbf{Original Size} & \textbf{Compressed Size} & \textbf{Compression Ratio} & \textbf{Exec Time} & \textbf{SNR}\\
+\hline
+Polynomial & 3.04 MB & 1.75 MB & 42.4\% & 108 + 209 ms & inf\\ 
+Lossy & 3.04 MB & 0.63 MB & 79.3\% & 59 + 145 ms & 23.9 dB\\
+\hline
+\end{tabular}
+\caption{Compression Performance Comparison of "balafon.wav"}
+\end{table}
+
+The results obtained differ significantly from the stereo samples, which might be due to certain processes the file underwent before being uploaded to the website "https://freesound.org/". Another possible explanation is that the sample values are more "predictable," meaning that they follow a discernible pattern.
+
+
 \subsection{Comparative Analysis}
 Our lossy encoder achieves at best, a 68\% size reduction from the original WAV file without too noticeable audio differences. In contrast, industry-standard codecs like MP3 typically achieve around a 75\% reduction while preserving good audio quality. This difference highlights the efficiency difference between our implementation and well-established, optimized codecs. 
 
