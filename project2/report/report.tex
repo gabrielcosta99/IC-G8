@@ -344,97 +344,246 @@ Key observations from the experimental results:
 \end{itemize}
 
 \section{Video Compression Techniques}
+Our video codec implementation consists of three distinct approaches, each building upon the previous one to achieve better compression while maintaining quality.
 
-\subsection{Intra-Frame Coding}
-The \texttt{IntraFrameVideoCodec} in C++ provides frame-independent compression with optimized spatial prediction and efficient entropy coding:
+\section{Intra-Frame Video Codec Implementation}
 
+\subsection{Overview}
+The implemented intra-frame video codec provides a robust solution for encoding video frames independently using spatial prediction and Golomb coding. The implementation supports the Y4M video format with various chroma subsampling patterns (4:2:0, 4:2:2, and 4:4:4), converting all inputs to 4:2:0 format during encoding for standardization.
+
+\subsection{Key Features}
+
+\subsubsection{Format Handling}
+The codec demonstrates sophisticated format handling capabilities:
 \begin{itemize}
-\item \textbf{Optimized Prediction Model}: Enhanced horizontal pixel prediction across Y, U, and V planes using OpenCV operations for reduced residuals.
-\item \textbf{Dynamic Format Handling}: Native support for YUV420p with real-time conversion from YUV422 and YUV444 formats.
-\item \textbf{Golomb Coding Efficiency}: Residuals encoded via Golomb coding, enhanced by a user-defined \texttt{m} parameter.
-\item \textbf{Y4M Format Parsing}: Robust parsing of Y4M headers for adaptive video dimension and format handling.
-\item \textbf{Progress Tracking}: Real-time encoding and decoding progress updates for user feedback.
+    \item Supports multiple input formats (YUV420p, YUV422, YUV444)
+    \item Automatic format detection from Y4M headers
+    \item Intelligent conversion to YUV420p for standardized processing
+    \item Proper dimension validation ensuring compatibility with YUV420p requirements
 \end{itemize}
 
-\subsubsection{Comparative Analysis}
+\subsubsection{Spatial Prediction}
+The implementation uses an efficient spatial prediction scheme:
+\begin{equation}
+    pred(x,y) = \begin{cases}
+        128 & \text{if } x = 0 \\
+        pixel(x-1,y) & \text{otherwise}
+    \end{cases}
+\end{equation}
+
+This approach:
 \begin{itemize}
-\item \textbf{Versus JPEG/H.264}: Provides purely lossless compression, unlike JPEG or H.264, making it suitable for high-fidelity use cases.
-\item \textbf{Compression Efficiency}: Lower than H.264 due to the absence of inter-frame prediction and transform coding.
+    \item Utilizes left-neighbor prediction for efficient spatial redundancy reduction
+    \item Handles edge cases by using a default value (128) for the first column
+    \item Implements prediction separately for Y, U, and V planes
 \end{itemize}
 
-\subsubsection{Challenges}
+\subsection{Limitations and Future Improvements}
+Current limitations and potential enhancements include:
 \begin{itemize}
-\item \textbf{Dimension Validation}: Strict enforcement of even dimensions for YUV420p compatibility.
-\item \textbf{Adaptive Format Parsing}: Handling diverse YUV formats.
+    \item Limited to fixed left-neighbor prediction
+    \item No adaptive Golomb parameter selection
+    \item Single-threaded implementation
+    \item Fixed prediction scheme without mode selection
 \end{itemize}
 
-\subsection{Inter-Frame Coding}
-The \texttt{InterFrameVideoCodec} in C++ implements efficient video compression through predictive coding, supporting both intra-frame (I-frame) and inter-frame (P-frame) encoding.
-
+Possible improvements:
 \begin{itemize}
-\item \textbf{Prediction Models}: Combines spatial intra-frame prediction with motion-compensated inter-frame prediction.
-\item \textbf{Block-Based Encoding}: Processes video frames in blocks with adjustable sizes and incorporates adaptive search ranges for efficiency.
-\item \textbf{Motion Estimation and Compensation}: Employs constrained search ranges and Sum of Absolute Differences (SAD) for motion vector accuracy.
-\item \textbf{Residual Management}: Encodes and quantizes residuals from predictions to optimize data storage.
-\item \textbf{Differential Motion Vector Encoding}: Reduces redundancy by encoding motion vector differences using Golomb coding.
+    \item Implementation of multiple prediction modes
+    \item Adaptive Golomb parameter selection
+    \item Parallel processing of frame planes
+    \item Enhanced compression through adaptive prediction schemes
 \end{itemize}
 
-\subsubsection{Temporal Prediction}
+\section{Inter-Frame Video Coding Implementation}
+\subsection{Overview}
+The implemented inter-frame video codec follows the requirements specified in Part IV of the project, providing both lossless and lossy compression capabilities. The implementation uses predictive coding techniques with motion compensation and builds upon the BitStream and Golomb coding foundations developed in earlier parts of the project.
+\subsection{Key Features}
+\subsubsection{Frame Types and Structure}
+The codec implements two primary frame types:
 \begin{itemize}
-\item \textbf{Hierarchical Motion Estimation}: Combines multi-scale search with constrained boundaries to ensure accuracy and computational efficiency.
-\item \textbf{Skip Mode}: Skips blocks with residuals below a defined threshold to further minimize data storage.
-\item \textbf{Rate-Distortion Optimization}: Dynamically selects between intra-frame and inter-frame coding modes based on residual and motion vector costs.
+\item \textbf{I-frames (Intra-frames):} Encoded independently using spatial prediction
+\item \textbf{P-frames (Predicted frames):} Encoded using motion compensation with reference to previous frames
+\end{itemize}
+The frame structure is controlled by the \texttt{iFrameInterval} parameter, which determines the frequency of I-frames in the encoded sequence.
+\subsubsection{Motion Estimation}
+The motion estimation algorithm includes several optimizations:
+\begin{itemize}
+\item Hierarchical search with multiple scales (8, 4, 2, 1)
+\item Early termination when SAD (Sum of Absolute Differences) falls below threshold
+\item Configurable search range and block size
+\item Spiral search pattern for efficient motion vector determination
+\end{itemize}
+\subsection{Block Mode Decision}
+The codec implements sophisticated block mode decision logic:
+\begin{equation}
+\text{Mode}{\text{block}} = \argmin{mode \in {intra,inter}} (\text{D}{mode} + \lambda \cdot \text{R}{mode})
+\end{equation}
+Where:
+\begin{itemize}
+\item $\text{D}{mode}$ represents the distortion for each mode
+\item $\text{R}{mode}$ represents the estimated bit rate
+\item $\lambda$ is the rate-distortion trade-off factor (set to 0.9)
+\end{itemize}
+\subsubsection{Advanced Features}
+The implementation includes several advanced features:
+\begin{enumerate}
+\item \textbf{Skip Mode:} For blocks with minimal changes
+\begin{itemize}
+\item Threshold-based detection (SKIP\_THRESHOLD = 3)
+\item Zero motion vector and residual assumption
+\end{itemize}
+\item \textbf{Multiple Prediction Modes:}
+\begin{itemize}
+    \item Spatial prediction for intra-coding
+    \item Temporal prediction with motion compensation
+    \item Adaptive mode selection based on block characteristics
 \end{itemize}
 
-\subsubsection{Comparative Analysis}
+\item \textbf{Efficient Residual Coding:}
 \begin{itemize}
-\item \textbf{Golomb Coding Efficiency}: Applies Golomb encoding for motion vectors and residuals, reducing storage costs with run-length optimizations.
-\item \textbf{Versus H.264}: Simpler than H.264, focusing on basic motion estimation, single reference frames, and no sub-pixel precision, yet efficient due to adaptive quantization and constrained encoding strategies.
+    \item Run-length encoding for zero coefficients
+    \item Differential coding for motion vectors
+    \item Golomb coding for entropy encoding
+\end{itemize}
+\end{enumerate}
+
+
+\section{Lossy Inter-frame Video Codec}
+The implemented lossy inter-frame video codec extends the basic inter-frame codec by introducing quantization of prediction residuals, enabling a trade-off between compression efficiency and video quality. This section describes the key components and mechanisms of the codec.
+\subsection{Codec Architecture}
+The codec operates on YUV420p format videos and implements both intra-frame (I-frames) and inter-frame (P-frames) coding with the following key features:
+\begin{itemize}
+\item Configurable I-frame interval for periodic reference frames
+\item Block-based motion estimation with adjustable block size and search range
+\item Adaptive mode decision between intra and inter prediction
+\item Quantization of prediction residuals with separate parameters for luma and chroma
+\item Run-length encoding of zero coefficients
+\item Differential encoding of motion vectors
+\end{itemize}
+\subsection{Quantization Mechanism}
+The codec implements a straightforward quantization scheme with the following characteristics:
+\begin{equation}
+Q_{value} = \frac{residual + sign(residual) \cdot QP/2}{QP}
+\end{equation}
+where $QP$ is the quantization parameter. For chrominance (UV) components, the QP is scaled by a factor of 2.0 to exploit the human visual system's reduced sensitivity to color information:
+\begin{equation}
+QP_{chroma} = QP_{luma} \cdot 2.0
+\end{equation}
+\subsection{Motion Estimation}
+The motion estimation process employs several optimization techniques:
+\begin{itemize}
+\item Hierarchical search with multiple scales (8, 4, 2, 1)
+\item Early termination when a good match is found (SAD < threshold)
+\item Rate-distortion optimization for mode decisions
+\item Skip mode for blocks with minimal changes
+\end{itemize}
+The motion estimation algorithm uses Sum of Absolute Differences (SAD) as the matching criterion:
+\begin{equation}
+SAD(mv) = \sum_{x,y} |C(x,y) - R(x+mv_x,y+mv_y)|
+\end{equation}
+where $C$ represents the current block and $R$ the reference frame.
+\subsection{Mode Decision}
+For each block in P-frames, the codec decides between intra and inter prediction modes based on rate-distortion optimization:
+\begin{equation}
+J = D + \lambda \cdot R
+\end{equation}
+where:
+\begin{itemize}
+\item $J$ is the rate-distortion cost
+\item $D$ is the distortion (SAD)
+\item $R$ is the estimated bit cost
+\item $\lambda$ is the Lagrangian multiplier (set to 0.9)
+\end{itemize}
+\subsection{Residual Coding}
+The quantized residuals are encoded using a combination of techniques:
+\begin{itemize}
+\item Run-length encoding for zero coefficients
+\item Golomb coding for non-zero values
+\item Separate encoding of sign and magnitude
+\item Maximum zero run length of 1024 for efficient encoding
+\end{itemize}
+\subsection{Performance Optimization}
+Several optimizations are implemented to improve coding efficiency:
+\begin{itemize}
+\item Skip mode for blocks with minimal changes (threshold = 3)
+\item Fast motion search with larger step sizes in initial phases
+\item Early termination of motion search (threshold = 256)
+\item Differential encoding of motion vectors to reduce bit rate
 \end{itemize}
 
-\subsubsection{Challenges}
+\section{Video Performance Analysis}
+\subsection{Experimental Setup}
+We conducted extensive compression trials on a test video (akiyo\_cif.y4m) using three distinct compression methodologies: intra-frame, inter-frame, and lossy inter-frame compression. The source material consisted of 300 frames in YUV420p color format, with the original dimensions preserved throughout all compression schemes.
+
+\subsection{Compression Performance Metrics}
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Metric} & \textbf{Intra-Frame} & \textbf{Inter-Frame} & \textbf{Lossy Inter} \\
+\hline
+Original Size & 43.51 MB & 43.51 MB & 43.51 MB \\
+Compressed Size & 23.14 MB & 17.51 MB & 10.53 MB \\
+Compression Ratio & 1.88:1 & 2.48:1 & 4.13:1 \\
+Space Saving & 46.81\% & 59.75\% & 75.80\% \\
+Bits per Frame & 647,042 & 489,674 & 280,988 \\
+\hline
+\end{tabular}
+\caption{Comparative Analysis of Compression Techniques}
+\label{tab:compression_metrics}
+\end{table}
+
+\subsection{Technical Implementation}
+
+\subsubsection{Intra-Frame Compression}
+The baseline intra-frame compression approach demonstrated moderate efficiency with the following characteristics:
 \begin{itemize}
-\item \textbf{Motion Estimation Complexity}: Balancing accuracy with computational overhead, particularly during hierarchical searches.
-\item \textbf{Error Propagation}: Addressing cumulative errors introduced by quantization in inter-frame predictions.
-\item \textbf{Memory Management}: Efficiently handling large video frames and buffers, especially during encoding/decoding.
+    \item Achieved a compression ratio of 1.88:1, resulting in 46.81\% storage reduction
+    \item Maintained perfect reconstruction quality through independent frame encoding
+    \item Required minimal metadata overhead (48 bytes)
+    \item Higher storage requirements at 647,042 bits per frame due to the absence of temporal redundancy exploitation
 \end{itemize}
 
-\subsubsection{Identified Limitations}
+\subsubsection{Inter-Frame Compression}
+The inter-frame compression methodology showed significant improvements through temporal redundancy exploitation:
 \begin{itemize}
-\item \textbf{Motion Estimation Simplifications}: Lacks sub-pixel precision, multiple reference frames, and advanced search patterns like diamond or hexagon searches.
-\item \textbf{Skip Mode Thresholding}: Fixed thresholds might not adapt optimally to varying content across videos.
+    \item Implemented with 8×8 pixel blocks and 8-pixel search range
+    \item Utilized strategic I-frame placement with 15-frame intervals (20 I-frames, 280 P-frames)
+    \item Achieved 59.75\% space reduction while maintaining lossless quality
+    \item Reduced bit rate to 489,674 bits/frame through motion compensation
+    \item Slight increase in metadata (55 bytes) to accommodate motion vectors
 \end{itemize}
 
-\subsection{Lossy Inter-Frame Coding}
-The \texttt{InterFrameVideoLossyCodec} enhances the base codec with advanced lossy compression techniques:
-
+\subsubsection{Lossy Inter-Frame Compression}
+The lossy compression configuration demonstrated the highest compression efficiency:
 \begin{itemize}
-\item \textbf{Dead-Zone Quantization}: Suppresses insignificant data using quantization with configurable steps for higher compression.
-\item \textbf{Adaptive Quantization Control}: Dynamically adjusts quantization levels based on scene complexity.
-\item \textbf{Run-Length Encoding}: Efficiently encodes zero residual runs to reduce entropy coding overhead.
-\item \textbf{Golomb Coding Integration}: Integrates optimized Golomb coding with zero-run length encoding.
-\item \textbf{Chroma Subsampling Optimization}: Applies higher quantization to chroma components for perceptual quality retention.
+    \item Maintained the same block size (8×8) and search range (8 pixels) as lossless inter-frame
+    \item Employed a quantization parameter (QP) value of 4
+    \item Achieved optimal compression ratio of 4.13:1
+    \item Reduced storage requirements to 280,988 bits/frame
+    \item Quality metrics indicate acceptable degradation with PSNR of 25.75 dB
 \end{itemize}
 
-\subsubsection{Comparative Analysis}
+\subsection{Comparative Analysis}
+The progression from intra-frame to lossy inter-frame compression reveals several key insights:
+
+\subsubsection{Efficiency Progression}
 \begin{itemize}
-\item \textbf{Versus H.264}: Simpler but achieves effective compression through adaptive quantization and motion estimation.
-\item \textbf{Golomb Coding Efficiency}: Enhanced with zero-run and run-length optimizations.
-\item \textbf{Lossy Compression Gains}: Achieves higher compression ratios with controlled quality loss.
+    \item Storage reduction improved significantly: 46.81\% → 59.75\% → 75.80\%
+    \item Bits per frame decreased proportionally: 647,042 → 489,674 → 280,988
+    \item Metadata overhead remained minimal across all implementations (48-55 bytes)
 \end{itemize}
 
-\subsubsection{Challenges}
-\begin{itemize}
-\item \textbf{Motion Estimation Complexity}: Balancing computational cost with motion accuracy.
-\item \textbf{Error Propagation}: Controlling error accumulation due to quantization.
-\item \textbf{Quantization Trade-offs}: Managing the balance between compression efficiency and visual quality.
-\end{itemize}
+\subsubsection{Quality-Size Tradeoffs}
+The lossy inter-frame compression achieved a 75.80\% reduction in file size. The PSNR value of 25.75 dB indicates acceptable quality for many applications, particularly considering the substantial storage savings.
 
-\subsubsection{Identified Limitations}
+\subsection{Implementation Considerations}
+Several factors contributed to the compression performance:
 \begin{itemize}
-\item \textbf{Fixed Quantization Levels}: Limited adaptability across diverse content types.
-\item \textbf{Lack of Transform Coding}: Absence of DCT or wavelet transforms reduces compression efficiency.
-\item \textbf{Basic Motion Estimation}: Lacks sub-pixel precision and multi-reference frames.
+    \item Consistent block size (8×8) and search range (8 pixels) across inter-frame methods provided a balanced approach to motion estimation
+    \item Strategic I-frame placement every 15 frames maintained reasonable random access capabilities while maximizing compression
+    \item YUV420p color format provided an efficient base representation for all compression methods
 \end{itemize}
 
 
