@@ -237,11 +237,15 @@ int main(int argc, char* argv[]){
 
     bool isLossless = (input == "1");
     int predictor_order = 3; // Default predictor order
-    int num_bits = 16;       // Default bitrate for lossy
+    int target_bitrate;     
+    int num_bits = 16;      // number of bits that each sample will have 
 
     if (!isLossless) {
-        cout << "Enter desired bitrate (number of bits): ";
-        cin >> num_bits;
+        cout << "Enter desired bitrate: ";
+        cin >> target_bitrate;
+
+        while(target_bitrate <= sample_rate*num_bits*channels)   num_bits--;
+        cout << "new number of bits per sample: " << num_bits << endl;
     }
 
     if (dynamicM) {
