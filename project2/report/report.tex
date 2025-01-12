@@ -80,6 +80,20 @@ Implements efficient entropy coding:
 \section{Audio Codec}
 In audio coding, our objective was to explore various audio compression methods aimed at reducing file size while preserving audio quality. To achieve this, we implemented two key approaches: a polynomial-based algorithm and an inter-channel residual calculation algorithm for lossless compression. For lossy compression, the polynomial algorithm was adapted by incorporating a quantization step.
 
+We chose the polynomial codec because it is simpler to implement. Given time constraints, we were unable to study and implement more complex algorithms, so we opted for a straightforward yet effective approach.
+
+\section{Golomb Parameter Optimization}
+The optimal Golomb parameter $m$ is estimated using the mean absolute value of residuals.
+To do so we:
+    \begin{itemize}
+        \item Calculate the mean absolute value ($\mu$) of residuals
+        \item Round that number to the nearest power of 2: $ m = 2^{\left\lceil {\log_2(\mu)} \right\rceil}$
+        % \begin{equation}
+        %     m = 2^{\left\lceil {\log_2(\mu)} \right\rceil}
+        % \end{equation}
+    \end{itemize}
+
+
 \subsection{Results}
 % \subsection{Performance Metrics}
 We tested two different stereo samples with the algorithms:
