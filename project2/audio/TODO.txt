@@ -1,3 +1,0 @@
-[] pq é que tenho de desquantizar o "predict + erro" em vez  de só o "erro" como é suposto?
-[] fazer o codigo para audios mono
-[] no calculo do M dinamico, ter em atenção que se for lossy, é necessario fazer um calculo com as samples quantizadas
